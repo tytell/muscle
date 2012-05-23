@@ -23,6 +23,10 @@ if (opt.initialcycles > 0)
     tinit = [0 opt.initialcycles*maxper];
     [t1,x1] = ode45(fcn, tinit, ics, odeopt);
     ics = x1(end,:);
+    if (any(isnan(ics)))
+        plot(t1,x1);
+        error('Initial cycles do not converge');
+    end
 end
 
 switch opt.method

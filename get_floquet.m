@@ -1,7 +1,4 @@
-function data = get_floquet(data,jfcn, nmodes, varargin)
-
-opt.neigenvalues = [];
-opt = parsevarargin(opt,varargin, 4);
+function data = get_floquet(data,jfcn, nmodes)
 
 N2 = 2*nmodes + 1;
 P = size(data.x,2);
@@ -14,13 +11,13 @@ for m = 1:N2
     A0(m,:,:) = jfcn(tph(m),x(m,:)');
 end
 
-A = zeros(N2*P, N2*P);
+A = sparse(N2*P, N2*P);
 for i = 1:P
     ki = (1:N2) + (i-1)*N2;
     for j = 1:P
         kj = (1:N2) + (j-1)*N2;
         
-        A(ki,kj) = diag(A0(:,i,j));
+        A = A + sparse(ki,kj, A0(:,i,j), N2*P,N2*P);
     end
 end
 
@@ -29,31 +26,19 @@ Omega = make_hb_omega(nmodes,P);
 
 Ahat = Ginv \ A * Ginv;
 
-F = 2*pi/data.per * Omega - Ahat;
+F = Ahat - 2*pi/data.per * Omega;
 
-[uf,mu] = eig(F);
+%[uf,mu] = eig(F);
+%[uf,mu] = eigs(F, P, 'si');
+[uf,mu] = floquet_eigs(F, P, data.per);
 
-mu = diag(mu);
-good = abs(imag(mu)) < 0.99*2*pi/data.per;
+uf = reshape(uf,[N2 P P]);
 
-mu = -mu(good);
-uf = uf(:,good);
-
-[~,ord] = sort(real(mu), 'descend');
-mu = mu(ord);
-uf = uf(:,ord);
-
-if (~isempty(opt.neigenvalues))
-    mu = mu(1:opt.neigenvalues);
-    uf = uf(:,1:opt.neigenvalues);
-end
-neig = length(mu);
-
-uf = reshape(uf,[N2 P neig]);
-
-x = zeros(length(data.t),P,neig);
+x = NaN(length(data.t),P,P);
 for i = 1:P
-    x(:,:,i) = fourier_sin_cos(data.t,uf(:,:,i),data.per);
+    if ~isnan(mu(i))
+        x(:,:,i) = fourier_sin_cos(data.t,uf(:,:,i),data.per);
+    end
 end    
 
 data.jfcn = jfcn;
@@ -78,20 +63,23 @@ bd = cell(1,P);
 [bd{:}] = deal(Ginv0);
 
 Ginv = blkdiag(bd{:});
+Ginv = sparse(Ginv);
 
 
 
 function Omega = make_hb_omega(N, P)
 
-Omega0 = zeros(2*N+1);
+a = 1:N;
+i = [2*a; 2*a+1];
+j = [2*a+1; 2*a];
+s = [a; -a];
 
-for i = 1:N
-    Omega0(2*i,   2*i+1) = i;
-    Omega0(2*i+1, 2*i  ) = -i;
-end
+i = repmat(i,[1 1 P]);
+j = repmat(j,[1 1 P]);
+s = repmat(s,[1 1 P]);
 
-bd = cell(1,P);
-[bd{:}] = deal(Omega0);
+i = bsxfun(@plus, i, reshape((2*N+1)*(0:P-1),[1 1 P]));
+j = bsxfun(@plus, j, reshape((2*N+1)*(0:P-1),[1 1 P]));
 
-Omega = blkdiag(bd{:});
+Omega = sparse(i(:),j(:),s(:));
 

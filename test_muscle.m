@@ -166,6 +166,9 @@ if (~getvar('L0data') || ~inputyn('Use existing data?', 'default',true))
     end
     L0data = reshape(L0data,[length(L0test) length(phitest2)]);
     putvar L0data;
+    
+    %reset L0
+    L0 = 2.7;
 end
 
 lcall = cat(3,L0data.x);
@@ -237,6 +240,11 @@ if (~getvar('NLdata') || ~inputyn('Use existing data?', 'default',true))
     end
     NLdata = reshape(NLdata,[length(phitest2) 2 2]);
     putvar NLdata;
+
+
+    lambda2 = -2.23;
+    xm = 0.4;
+    xp = 1.33;
 end
 
 Pcnl = cat(2,NLdata.Pc);
@@ -262,6 +270,95 @@ fx = reshape(fx,[4 size(NLdata)]);
 plot(phitest2,squeeze(fx(1,:,:)),'o-');
 xlabel('Activation phase');
 ylabel('Mode 1 exponent');
+
+Btest = [5 10 15 20];
+if (~getvar('Bdata') || ~inputyn('Use existing B data?', 'default',true))
+    Bdata = struct([]);
+    for i = 1:length(phitest2)
+        phi = phitest2(i);
+        for j = 1:length(Btest)
+            B = Btest(j);
+            
+            L = @(t) L0 + A * cos(2*pi/T * (t - phi));
+            X0 = [L(0) - ls0   0   0   0];
+
+            [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x), 0.005, T, X0, ...
+                'Display','iter-detailed', 'fixedperiod',true, 'initialcycles',2, 'TolX',1e-8, 'RelTol',1e-6);
+            data1.Pc = Pc(data1.x(:,1), data1.x(:,2), data1.x(:,4));
+
+            data1 = get_floquet(data1,@(t,x) jfcn(t,x), 100, 'neigenvalues',4);
+            data1.L = L;
+            data1.B = B;
+            Bdata = makestructarray(Bdata,data1);
+        end
+    end
+    Bdata = reshape(Bdata,[length(Btest) length(phitest2)]);
+    putvar Bdata;
+    
+    B = 10;
+end
+
+figure(8);
+fx = cat(3,Bdata.fexp);
+fx = reshape(fx,[4 size(Bdata)]);
+plot(Btest,log(0.5) ./ real(squeeze(fx(1,:,:))),'o-');
+
+xlabel('Damping coefficient');
+ylabel('t_{1/2} (sec)');
+title('Mode one time constant vs damping');
+
+k3test = 0.6:0.1:1.4;
+k4test = [0.8 1 1.2];
+if (~getvar('k34data') || ~inputyn('Use existing k3 k4 data?', 'default',true))
+    phi = 0;
+    k30 = k3;
+    k40 = k4;
+    
+    L = @(t) L0 + A * cos(2*pi/T * (t - phi));
+    X0 = [L(0) - ls0   0   0   0];
+    
+    k34data = struct([]);
+    for i = 1:length(k3test)
+        k3 = k30*k3test(i);
+        for j = 1:length(k4test)
+            k4 = k40*k4test(j);
+            
+            [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x), 0.005, T, X0, ...
+                'Display','iter-detailed', 'fixedperiod',true, 'initialcycles',2, 'TolX',1e-8, 'RelTol',1e-6);
+            data1.Pc = Pc(data1.x(:,1), data1.x(:,2), data1.x(:,4));
+
+            data1 = get_floquet(data1,@(t,x) jfcn(t,x), 100, 'neigenvalues',4);
+            data1.L = L;
+            data1.k3 = k3;
+            data1.k4 = k4;
+            k34data = makestructarray(k34data,data1);
+        end
+    end
+    k34data = reshape(k34data,[length(k4test) length(k3test)]);
+    putvar k34data;
+    
+    k3 = k30;
+    k4 = k40;
+end
+
+figure(9);
+fx = cat(3,k34data.fexp);
+fx = reshape(fx,[4 size(k34data)]);
+plot(k3test*k3,log(0.5) ./ real(squeeze(fx(1,:,:))),'o-');
+
+lab = cell(size(k4test));
+for i = 1:length(k4test)
+    lab{i} = sprintf('%.2g',k4test(i)*k4);
+    if (i == 1)
+        lab{i} = ['k4 = ' lab{i}];
+    end
+end
+labellines(lab ,'rotation',0);
+
+xlabel('k3');
+ylabel('t_{1/2} (sec)');
+title('Mode one time constant vs k3 and k4');
+
 
     function [hx,dhx] = h(x)
         
