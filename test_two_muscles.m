@@ -1,4 +1,4 @@
-function test_two_muscles
+function test_two_muscles3
 
 mu = 600;
 lc0 = 2.6;
@@ -19,13 +19,12 @@ xmax = 1.8;
 s = 0.1;
 dphi = 0.5;
 T = 1;
+duty = 0.36;
 
 L0 = 2.7;
 M = 0.5;
 zeta = 0.5;
 omegar = 2;
-
-act = @(t) [mod(t,1) < 0.36; mod(t-dphi,1) < 0.36];
 
 dt = 0.005;
 
@@ -228,14 +227,13 @@ if (~getvar('dutydata') || ~inputyn('Use existing data?', 'default',true))
     a = 1;
     n = length(omegarvals) * length(zetavals) * length(dutycyclevals);
     for k = 1:length(dutycyclevals)
-        dutycycle = dutycyclevals(k);
-        act = @(t) [mod(t,1) < dutycycle; mod(t-dphi,1) < dutycycle];
+        duty = dutycyclevals(k);
         
         for j = 1:length(zetavals)
             zeta = zetavals(j);
             for i = 1:length(omegarvals)
                 omegar = omegarvals(i);
-                fprintf('Duty = %g, Zeta = %g, OmegaR = %g\n', dutycycle, zeta, omegar);
+                fprintf('Duty = %g, Zeta = %g, OmegaR = %g\n', duty, zeta, omegar);
 
                 [~,~,data1] = get_limit_cycle(@odefcn, 0.005, T, X0, ...
                     'Display','iter-detailed', 'fixedperiod',true, 'initialcycles',10, 'TolX',1e-8, 'RelTol',1e-6);
@@ -244,7 +242,6 @@ if (~getvar('dutydata') || ~inputyn('Use existing data?', 'default',true))
 
             data1 = get_floquet(data1,@(t,x) jfcn(t,x), 150);
                 data1.dutycycle = dutycycle;
-                data1.act = act;
                 data1.zeta = zeta;
                 data1.omegar = omegar;
                 dutydata = makestructarray(dutydata,data1);
@@ -294,6 +291,14 @@ for i = 1:2
     title(sprintf('Mode %d time constants',i));
 end
 
+    function actval = act(t)
+        
+        t1 = mod(t,1);
+        actval(1,:) = double(t1 < duty);
+        actval(2,:) = double(((t1 >= 0.5) & (t1 < 0.5+duty)) | ((t1 >= 0) & (t1 < duty-0.5)));
+
+    end
+
     function [hx,dhx] = h(x)
         
         exs = exp(x/s);
@@ -304,14 +309,11 @@ end
         
     end
 
-    function [hl,dl] = lambdafcn(lc)
+    function [l0,dl] = lambdafcn(lc)
         
         l0 = 1 + lambda2 * (lc - lc0).^2;
-        if (nargout == 1)
-            hl = h(l0);
-        else
-            [hl,dhl] = h(l0);
-            dl = 2.*lambda2.*(lc - lc0) .* dhl;
+        if (nargout == 2)
+            dl = 2.*lambda2.*(lc - lc0);
         end
         
     end
@@ -319,16 +321,13 @@ end
     function [x,dx] = xifcn(vc)
         
         if (nargout == 1)
-            x0 = 1 + xp * h(vc) - xm * h(-vc);
-            x = h(x0);
+            x = 1 + xp * h(vc) - xm * h(-vc);
         else
             [hvcp,dhvcp] = h(vc);
             [hvcm,dhvcm] = h(-vc);
-            x0 = 1 + xp * hvcp - xm * hvcm;
-            [x,dhx] = h(x0);
+            x = 1 + xp * hvcp - xm * hvcm;
             
-            dx = (xm .* dhvcm + xp .* dhvcp) .* ...
-                dhx;
+            dx = xm .* dhvcm + xp .* dhvcp;
         end
         
     end
@@ -348,8 +347,9 @@ end
         L = x(9,:);
         V = x(10,:);
         
-        actval = act(t);
-        %Lval = L(t);
+        t1 = mod(t,1);
+        actval(1,:) = double(t1 < duty);
+        actval(2,:) = double(((t1 >= 0.5) & (t1 < 0.5+duty)) | ((t1 >= 0) & (t1 < duty-0.5)));
         
         gact = 1./(1+exp(2-(actval-0.5)/s));
         
@@ -358,8 +358,11 @@ end
             gact .* k1 .* (C - Ca - Caf) + ...
             (1 - gact) .* k2 .* Ca .* (C - S - Ca - Caf);
         dlc = vc;
-        
-        Pcval = Pc(lc,vc,Caf);
+
+        xi = 1 + xp * h(vc) - xm * h(-vc);
+        lambda = 1 + lambda2 * (lc - lc0).^2;
+        Pcval = P0 .* lambda .* xi .* Caf;
+
         dvc(1,:) = 1/mm * (-Pcval(1,:) + mu * (L - lc(1,:) - ls0) - B * vc(1,:));
         dvc(2,:) = 1/mm * (-Pcval(2,:) + mu * (2*L0-L - lc(2,:) - ls0) - B * vc(2,:));
         
