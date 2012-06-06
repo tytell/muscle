@@ -33,13 +33,11 @@ switch opt.method
     case 'shooting'
         tspan = [0 maxper];
         
-        if (~opt.fixedperiod)
-            odeopt = odeset(odeopt, 'Events',@(t,x) istransverse(t,x, ics',fcn));
-        end
-        [fp, d] = lsqnonlin(@(x) returnval(x, fcn, tspan, odeopt), ics', [],[], minopt);
+        [fp, d] = lsqnonlin(@(x) returnval(x, fcn, tspan, odeopt, opt.fixedperiod), ics', [],[], minopt);
         
         if (~opt.fixedperiod)
-            odeopt = odeset(odeopt, 'Events',@(t,x) istransverse(t,x, fp,fcn));
+            ftrn = fcn(0,fp);
+            odeopt = odeset(odeopt, 'Events',@(t,x) istransverse(t,x, fp,ftrn));
         end
         sol = ode45(fcn, tspan, fp, odeopt);
         
@@ -61,8 +59,12 @@ switch opt.method
  end
 
 
-function dx = returnval(x0, fcn, tspan, odeopt)
+function dx = returnval(x0, fcn, tspan, odeopt, isfixper)
 
+if ~isfixper
+    ftrn = fcn(0,x0);
+    odeopt = odeset(odeopt, 'Events',@(t,x) istransverse(t,x, x0,ftrn));
+end
 sol = ode45(fcn, tspan, x0, odeopt);
 
 if (isfield(sol,'ye'))
@@ -72,9 +74,7 @@ else
 end
 
 
-function [value,isterminal,direction] = istransverse(t,x, v0,fcn)
-
-ftrn = fcn(t,x);
+function [value,isterminal,direction] = istransverse(t,x, v0,ftrn)
 
 v = x(1:length(v0));
 value = ftrn' * (v-v0);

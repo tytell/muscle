@@ -27,7 +27,7 @@ L = @(t) L0 + A * cos(2*pi/T * (t - phi));
 
 dt = 0.005;
 phitest = 0:0.05:0.95;
-showphi = [3 7 11 15];
+showphi = [1 6 11 17];
 
 if (~getvar('data') || ~inputyn('Use existing data?', 'default',true))
     data = struct([]);
@@ -41,12 +41,56 @@ if (~getvar('data') || ~inputyn('Use existing data?', 'default',true))
             'Display','iter-detailed', 'fixedperiod',true, 'initialcycles',2, 'TolX',1e-8, 'RelTol',1e-6);
         data1.Pc = Pc(data1.x(:,1), data1.x(:,2), data1.x(:,4));
         
-        data1 = get_floquet(data1,@(t,x) jfcn(t,x), 100, 'neigenvalues',4);
+        data1 = get_floquet(data1,@(t,x) jfcn(t,x), 100);
         data1.L = L;
         data = makestructarray(data,data1);
     end
     putvar data;
 end
+
+Pcall = cat(2,data.Pc);
+
+figureseries('Phase effect');
+clf;
+maxforce = max(Pcall(:));
+hax = -1*ones(4,2);
+for i = 1:4
+    hax(i,1) = subplot(2,2,i);
+    hax(i,2) = copyobj(hax(i,1), gcf);
+    
+    pos = get(hax(i,1),'Position');
+    height = pos(4);
+    pos1 = pos;
+    pos1(2) = pos1(2) + 0.25*height;
+    pos1(4) = 0.75*height;
+    pos2 = pos;
+    pos2(4) = 0.25*height;
+    
+    set(hax(i,1),'Position',pos1);
+    set(hax(i,2),'Position',pos2);
+    
+    fill([0 0.36 0.36 0],[0 0 maxforce maxforce],[0.8 0.8 0.8], 'Parent',hax(i,1), ...
+        'EdgeColor','none');
+
+    fill([0 0.36 0.36 0],L0 + [-A -A A A],[0.8 0.8 0.8], 'Parent',hax(i,2), ...
+        'EdgeColor','none');
+
+    j = showphi(i);
+    
+    addplot(hax(i,1), data(j).t, data(j).Pc, 'r-', 'LineWidth',2);
+    addplot(hax(i,2), data(j).t, data(j).L(data(j).t),'k-');
+    axis(hax(i,2),'tight');
+    xtick(hax(i,1), 'labeloff');
+    
+    xlabel(hax(i,2),'Time (s)');
+    ylabel(hax(i,1),'Force (mN)');
+    
+    yl = get(hax(i,1),'YLim');
+    maxforce = max(maxforce,yl(2));
+end;
+set(hax(:,1),'YLim',[0 maxforce]);
+set(hax, 'TickDir','out');
+set(hax(:,2), 'YAxisLocation','right');
 
 fxx = cat(4, data.fx);
 sgn1 = sign(fxx(1,1,1,:));
@@ -54,7 +98,7 @@ fxx(:,:,1,:) = bsxfun(@times, fxx(:,:,1,:), sgn1);
 
 fexp = cat(2,data.fexp);
 
-figure(1);
+figureseries('Mode time constants');
 plot(phitest, log(0.5) ./ real(fexp)');
 xlabel('Phase');
 ylabel('t_{1/2} (sec)');
@@ -62,7 +106,7 @@ title('Mode time constants');
 
 t = data(1).t;
 
-figure(2);
+figureseries('Floquet modes vs. phi');
 clf;
 for i = 1:4,
     subplot(2,2,i);
@@ -73,7 +117,7 @@ for i = 1:4,
 end
 legend('lc','vc','Ca','Caf','Location','best');
 
-figure(3);
+figureseries('Deviation from steady vs. phi');
 clf;
 for i = 1:4,
     subplot(2,2,i);
@@ -85,8 +129,6 @@ for i = 1:4,
 end
 legend([h1(1); h2], 'steady','lc','vc','Ca','Caf','Location','best');
 
-figure(4);
-clf;
 Pcdevall = zeros(length(t),length(phitest),length(phitest));
 W0 = zeros(length(phitest),1);
 Wdev = zeros(length(phitest),length(phitest));
@@ -119,20 +161,29 @@ for i = 1:length(data)
     %pause;
 end
 
-figure(4);
+figureseries('Effect of perturbations');
 clf;
-showphi = [0.1 0.5 0.7];
-ishowphi = zeros(size(showphi));
-for i = 1:length(showphi)
-    j  = find(phitest >= showphi(i), 1);
-    ishowphi(i) = j;
+showphi = 1;
+plot(data(showphi).t, data(showphi).Pc, 'k--','LineWidth',2);
+for i = 1:4:length(phitest),
+    addplot(data(showphi).t, Pcdevall(:,showphi,i), 'r-');
 end
-plot(phitest, W0, phitest, Wdev(:,ishowphi));
-xlabel('Activation phase');
-ylabel('Work');
-legend('steady','perturbed','Location','best');
 
-figure(5);
+figureseries('Change in work');
+clf;
+showphi = 1:5:length(phitest);
+plot(phitest, bsxfun(@minus,Wdev(showphi,:),W0(showphi)) / max(abs(W0)));
+xlabel('Perturbation phase');
+ylabel('Work');
+
+lab = cell(size(showphi));
+for i = 1:length(showphi)
+    lab{i} = num2str(phitest(showphi(i)));
+end
+
+labellines(lab, 'location',[0.6 0.6 0.65 0.45],'rotation',0);
+
+figureseries('Change in work contour');
 clf;
 contourf(phitest, phitest, bsxfun(@minus, Wdev, W0)' / max(abs(W0)));
 hcol = colorbar;
@@ -159,7 +210,7 @@ if (~getvar('L0data') || ~inputyn('Use existing data?', 'default',true))
                 'Display','iter-detailed', 'fixedperiod',true, 'initialcycles',2, 'TolX',1e-8, 'RelTol',1e-6);
             data1.Pc = Pc(data1.x(:,1), data1.x(:,2), data1.x(:,4));
 
-            data1 = get_floquet(data1,@(t,x) jfcn(t,x), 100, 'neigenvalues',4);
+            data1 = get_floquet(data1,@(t,x) jfcn(t,x), 100);
             data1.L = L;
             L0data = makestructarray(L0data,data1);
         end
@@ -175,7 +226,7 @@ lcall = cat(3,L0data.x);
 lcall = squeeze(lcall(:,1,:));
 lcall = reshape(lcall, [size(lcall,1) size(L0data)]);
 
-figure(6);
+figureseries('Length effect');
 clf;
 subplot(2,2,1);
 lc1 = 0.7*lc0:0.01:1.3*lc0;
@@ -231,7 +282,7 @@ if (~getvar('NLdata') || ~inputyn('Use existing data?', 'default',true))
                     'Display','iter-detailed', 'fixedperiod',true, 'initialcycles',2, 'TolX',1e-8, 'RelTol',1e-6);
                 data1.Pc = Pc(data1.x(:,1), data1.x(:,2), data1.x(:,4));
 
-                data1 = get_floquet(data1,@(t,x) jfcn(t,x), 100, 'neigenvalues',4);
+                data1 = get_floquet(data1,@(t,x) jfcn(t,x), 100);
                 data1.L = L;
 
                 NLdata = makestructarray(NLdata,data1);
@@ -250,7 +301,7 @@ end
 Pcnl = cat(2,NLdata.Pc);
 Pcnl = reshape(Pcnl, [size(Pcnl,1) size(NLdata)]);
 
-figure(7);
+figureseries('Nonlinearity effect');
 clf;
 for i = 1:5,
     subplot(2,3,i);
@@ -286,7 +337,7 @@ if (~getvar('Bdata') || ~inputyn('Use existing B data?', 'default',true))
                 'Display','iter-detailed', 'fixedperiod',true, 'initialcycles',2, 'TolX',1e-8, 'RelTol',1e-6);
             data1.Pc = Pc(data1.x(:,1), data1.x(:,2), data1.x(:,4));
 
-            data1 = get_floquet(data1,@(t,x) jfcn(t,x), 100, 'neigenvalues',4);
+            data1 = get_floquet(data1,@(t,x) jfcn(t,x), 100);
             data1.L = L;
             data1.B = B;
             Bdata = makestructarray(Bdata,data1);
@@ -298,7 +349,7 @@ if (~getvar('Bdata') || ~inputyn('Use existing B data?', 'default',true))
     B = 10;
 end
 
-figure(8);
+figureseries('Damping effect');
 fx = cat(3,Bdata.fexp);
 fx = reshape(fx,[4 size(Bdata)]);
 plot(Btest,log(0.5) ./ real(squeeze(fx(1,:,:))),'o-');
@@ -327,7 +378,7 @@ if (~getvar('k34data') || ~inputyn('Use existing k3 k4 data?', 'default',true))
                 'Display','iter-detailed', 'fixedperiod',true, 'initialcycles',2, 'TolX',1e-8, 'RelTol',1e-6);
             data1.Pc = Pc(data1.x(:,1), data1.x(:,2), data1.x(:,4));
 
-            data1 = get_floquet(data1,@(t,x) jfcn(t,x), 100, 'neigenvalues',4);
+            data1 = get_floquet(data1,@(t,x) jfcn(t,x), 100);
             data1.L = L;
             data1.k3 = k3;
             data1.k4 = k4;
@@ -341,7 +392,7 @@ if (~getvar('k34data') || ~inputyn('Use existing k3 k4 data?', 'default',true))
     k4 = k40;
 end
 
-figure(9);
+figureseries('Calcium dynamics effect');
 fx = cat(3,k34data.fexp);
 fx = reshape(fx,[4 size(k34data)]);
 plot(k3test*k3,log(0.5) ./ real(squeeze(fx(1,:,:))),'o-');

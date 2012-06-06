@@ -1,4 +1,4 @@
-function test_two_muscles3
+function test_two_muscles
 
 mu = 600;
 lc0 = 2.6;
@@ -112,12 +112,15 @@ title('Mode one time constants');
 
 figureseries('Floquet modes vs resonant frequency');
 clf;
+hln = -1*ones(10,1);
 for i = 1:4,
     subplot(2,2,i);
     j = showfreq(i);
     
     if (isreal(fxx(:,:,1,j)))
-        plot(freqdata(j).t, fxx(:,:,1,j));
+        hln(1:4) = plot(freqdata(j).t, fxx(:,1:4,1,j));
+        hln(5:8) = addplot(freqdata(j).t, fxx(:,5:8,1,j),'--');
+        hln(9:10) = addmplot(freqdata(j).t, fxx(:,9:10,1,j),'k-|k--','LineWidth',2);
     else
         plot(freqdata(j).t, real(fxx(:,:,1,j)));
         addplot(freqdata(j).t, imag(fxx(:,:,1,j)),'--');
@@ -125,7 +128,7 @@ for i = 1:4,
     xlabel('Time (s)');
     title(sprintf('f_{res} = %g',omegarvals(j)/(2*pi)));
 end
-%legend('lc','vc','Ca','Caf','L','V','Location','best');
+legend(hln([1:4 9 10]),'lc','vc','Ca','Caf','L','V','Location','best');
 
 zetaold = zeta;
 omegarold = omegarvals;
