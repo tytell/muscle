@@ -1,14 +1,27 @@
-function data = get_floquet(data,jfcn, nmodes)
+function data = get_floquet(data,jfcn, nmodes, varargin)
+
+opt.odetype = 'direct';
+opt = parsevarargin(opt, varargin, 4);
 
 N2 = 2*nmodes + 1;
 P = size(data.x,2);
 
 tph = (1:N2)'/N2 * data.per;
-x = deval(data.sol, tph)';
+[x,xp] = deval(data.sol, tph);
+x = x';
+xp = xp';
 
 A0 = zeros(N2,P,P);
-for m = 1:N2
-    A0(m,:,:) = jfcn(tph(m),x(m,:)');
+switch opt.odetype
+    case 'direct'
+        for m = 1:N2
+            A0(m,:,:) = jfcn(tph(m),x(m,:)');
+        end
+    case 'implicit'
+        for m = 1:N2
+            [A1,B1] = jfcn(tph(m), x(m,:)', xp(m,:)');
+            A0(m,:,:) = -B1 \ A1;
+        end
 end
 
 A = sparse(N2*P, N2*P);
