@@ -244,7 +244,7 @@ if (~getvar('dutydata') || ~inputyn('Use existing data?', 'default',true))
                 data1.Pc(:,2) = Pc(data1.x(:,5), data1.x(:,6), data1.x(:,8));
 
             data1 = get_floquet(data1,@(t,x) jfcn(t,x), 150);
-                data1.dutycycle = dutycycle;
+                data1.dutycycle = duty;
                 data1.zeta = zeta;
                 data1.omegar = omegar;
                 dutydata = makestructarray(dutydata,data1);
