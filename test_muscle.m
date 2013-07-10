@@ -11,7 +11,7 @@ k1 = 9.6;
 k2 = 5.9;
 k3 = 65;
 k4 = 45;
-M = 0.05;
+M = 0.01;
 B = 10;
 xm = 0.4;
 xp = 1.33;
@@ -29,6 +29,8 @@ dt = 0.005;
 phitest = 0:0.05:0.95;
 showphi = [1 6 11 17];
 
+pertmag = 0.1;
+    
 if (~getvar('data') || ~inputyn('Use existing data?', 'default',true))
     data = struct([]);
     for i = 1:length(phitest)
@@ -117,6 +119,31 @@ for i = 1:4,
 end
 legend('lc','vc','Ca','Caf','Location','best');
 
+figureseries('Floquet exp');
+clf;
+i = 1;
+subplot(2,2,1);
+plot(data(i).t, fxx(:,:,1,i), 'LineWidth',2);
+xlabel('Time (s)');
+labellines({'\delta l_c','\delta v_c', '\delta Ca', '\delta Caf'}, ...
+    'location',[0.7 0.8 0.7 0.42],'rotation',0);
+
+a = find(t >= phitest(6),1);
+k = [a:length(t) 1:a-1]';
+dec = exp(data(i).fexp(1)*data(i).t);
+dec1 = zeros(size(dec));
+dec1(k) = dec;
+
+subplot(2,2,2);
+plot(data(i).t, dec1,'k-', 'LineWidth',2);
+xlabel('Time (s)');
+
+subplot(2,4,6:7);
+plot(data(i).t, bsxfun(@times, fxx(:,:,1,i), dec1), 'LineWidth',2);
+xlabel('Time (s)');
+
+
+
 figureseries('Deviation from steady vs. phi');
 clf;
 for i = 1:4,
@@ -129,36 +156,175 @@ for i = 1:4,
 end
 legend([h1(1); h2], 'steady','lc','vc','Ca','Caf','Location','best');
 
-Pcdevall = zeros(length(t),length(phitest),length(phitest));
-W0 = zeros(length(phitest),1);
-Wdev = zeros(length(phitest),length(phitest));
-for i = 1:length(data)
+if (~getvar('pertdata') || ~inputyn('Use existing data?', 'default',true))
+    i = 3;
+    t0 = data(i).t;
     xbase = data(i).x;
     Pcbase = data(i).Pc;
     
-    W0(i) = trapz(-data(i).L(t), Pcbase);
-    % plot(-data(i).L(t), Pcbase, 'k-');
-    % fprintf('Total work at phase %g = %g\n', phitest(i), W0(i));
+    L = data(i).L;
     
-    dec = exp(data(i).fexp(1)*data(i).t);
-    for j = 1:length(phitest),
-        a = find(t >= phitest(j),1);
-        k = [a:length(t) 1:a-1]';
-        dec1 = zeros(size(dec));
-        dec1(k) = dec;
-        
-        dev1 = fxx(:,:,1);
-        %dev1 = dev1 / sqrt(sum(dev1(1,:).^2));
-        dev1 = bsxfun(@times, dev1, dec1);
-        
-        xfx1 = xbase + 0.2*dev1;
-        Pcdevall(:,i,j) = Pc(xfx1(:,1),xfx1(:,2),xfx1(:,4));
-        
-        Wdev(i,j) = trapz(-data(i).L(t), Pcdevall(:,i,j));
-        %addplot(-data(i).L(t), Pcdevall(:,i,j), 'r-');
-        %drawnow;
+    phipert = [0.2 0.7 0.2 0.2];
+    pertval = [0.1 0 0 0; ...
+        0.1 0 0 0;
+        0 0.5 0 0;
+        0 0 0 -0.1];
+
+    pertdata = struct([]);
+    odeopt = odeset('RelTol',1e-6);
+    for j = 1:length(phipert)
+        a = find(t >= phipert(j),1);
+
+        xinit = xbase(a,:) + pertval(j,:);
+        sol = ode45(@odefcn, t0(a) + [0 T], xinit', odeopt);
+
+        x1 = NaN(size(xbase));
+        x1(a:end,:) = deval(sol, t0(a:end))';
+        if (a > 1)
+            x1(1:a-1,:) = deval(sol, T + t0(1:a-1))';
+        end
+        Pc1 = Pc(x1(:,1), x1(:,2), x1(:,4));
+
+        pertdata(i,j).phipert = phipert(j);
+        pertdata(i,j).x0 = xbase;
+        pertdata(i,j).Pc0 = Pcbase;
+        pertdata(i,j).t = t0;
+        pertdata(i,j).x = x1;
+        pertdata(i,j).xinit = xinit;
+        pertdata(i,j).Pc = Pc1;
     end
-    %pause;
+    
+    putvar pertdata;
+end
+
+figureseries('Random perturbations');
+clf;
+i = 3;
+t0 = pertdata(i,1).t;
+xbase = pertdata(i,1).x0;
+Pcbase = pertdata(i,1).Pc0;
+
+hax = tight_subplot(4,1, 0.02,[0.12 0.01],[0.12 0.01]);
+
+plot(hax(1), t0,xbase(:,1), 'k-', 'LineWidth',2);
+plot(hax(2), t0,xbase(:,2), 'k-', 'LineWidth',2);
+plot(hax(3), t0,xbase(:,4), 'k-', 'LineWidth',2);
+plot(hax(4), t0,Pcbase, 'k-', 'LineWidth',2);
+
+col = 'rgbc';
+for j = 1:size(pertdata,2)
+    addplot(hax(1), t0,pertdata(i,j).x(:,1), [col(j) '--']);
+    addplot(hax(2), t0,pertdata(i,j).x(:,2), [col(j) '--']);
+    addplot(hax(3), t0,pertdata(i,j).x(:,4), [col(j) '--']);
+    addplot(hax(4), t0,pertdata(i,j).Pc, [col(j) '--']);
+end
+
+linkaxes(hax(1:4), 'x');
+axis(hax(1),'tight');
+axis(hax(2),'tight');
+axis(hax(3),'tight');
+axis(hax(4),'tight');
+xtick(hax(1),'labeloff');
+xtick(hax(2),'labeloff');
+xtick(hax(3),'labeloff');
+
+ylabel(hax(1),'l_c (cm)');
+ylabel(hax(2),'v_c (cm/s)');
+ylabel(hax(3),'Caf');
+ylabel(hax(4),'P_c (mN)');
+xlabel(hax(4),'Time (sec)');
+
+set(hax,'Box','off', 'TickDir','out');
+
+if (~getvar('devdata','Pcdevall','W0','Wdev') || ~inputyn('Use existing data?', 'default',true))
+    devdata = struct([]);
+    
+    figureseries('Test');
+    clf;
+    
+    Pcdevall = zeros(length(t),length(phitest),length(phitest));
+    W0 = zeros(length(phitest),1);
+    Wdev = zeros(length(phitest),length(phitest));
+    
+    n = 1;
+    N = length(data) * length(phitest);
+    timedWaitBar(0, 'Computing deviations...');
+    odeopt = odeset('RelTol',1e-6);
+    for i = 1:length(data)
+        t0 = data(i).t;
+        xbase = data(i).x;
+        Pcbase = data(i).Pc;
+
+        L = data(i).L;
+        
+        W0(i) = trapz(-data(i).L(t), Pcbase);
+        % plot(-data(i).L(t), Pcbase, 'k-');
+        % fprintf('Total work at phase %g = %g\n', phitest(i), W0(i));
+
+        dec = exp(data(i).fexp(1)*data(i).t);
+        for j = 1:length(phitest),
+            a = find(t >= phitest(j),1);
+            k = [a:length(t) 1:a-1]';
+            dec1 = zeros(size(dec));
+            dec1(k) = dec;
+
+            dev1 = fxx(:,:,1,i);
+            %dev1 = dev1 / sqrt(sum(dev1(1,:).^2));
+            dev1 = bsxfun(@times, dev1, dec1);
+
+            xfx1 = xbase + 0.2*dev1;
+            Pcdevall(:,i,j) = Pc(xfx1(:,1),xfx1(:,2),xfx1(:,4));
+
+            Wdev(i,j) = trapz(-data(i).L(t), Pcdevall(:,i,j));
+            %addplot(-data(i).L(t), Pcdevall(:,i,j), 'r-');
+            %drawnow;
+            
+            if (ismember(j,showphi))
+                sol = ode45(@odefcn, t0(a) + [0 T], xfx1(a,:)', odeopt);
+
+                x1 = NaN(size(xbase));
+                x1(a:end,:) = deval(sol, t0(a:end))';
+                if (a > 1)
+                    x1(1:a-1,:) = deval(sol, T + t0(1:a-1))';
+                end
+                Pc1 = Pc(x1(:,1), x1(:,2), x1(:,4));
+            else
+                x1 = [];
+                Pc1 = [];
+            end
+
+            devdata(i,j).phipert = phi;
+            devdata(i,j).x0 = xbase;
+            devdata(i,j).Pc0 = Pcbase;
+            devdata(i,j).t = t0;
+            devdata(i,j).x = x1;
+            devdata(i,j).xfx = xfx1;
+            devdata(i,j).Pc = Pc1;
+                        
+            n = n+1;
+            
+            timedWaitBar(n/N, 'Computing deviations...');
+        end
+        putvar devdata Pcdevall W0 Wdev;
+        %pause;
+    end
+end
+
+figureseries('Check Floquet');
+clf;
+showphi = [1 6 11 17];
+k = 1;
+for ii = 1:4
+    i = showphi(ii);
+    for jj = 1:4
+        j = showphi(jj);
+        
+        subplot(4,4,k);
+        plot(devdata(i,j).t,devdata(i,j).x0,'k-');
+        addplot(devdata(i,j).t,devdata(i,j).x, '--', 'LineWidth',2);
+        addplot(devdata(i,j).t,devdata(i,j).xfx,':', 'LineWidth',2);
+        k = k+1;
+    end
 end
 
 figureseries('Effect of perturbations');

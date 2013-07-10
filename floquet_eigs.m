@@ -12,7 +12,15 @@ n = 0;
 mu = NaN(P,1);
 uf = NaN(size(F,1),P);
 while (n < P)
-    [uf1, mu1] = eigs(F,1, guess);
+    try
+        [uf1, mu1] = eigs(F,1, guess);
+    catch err
+        if strcmp(err.identifier, 'MATLAB:eigs:ARPACKroutineErrorMinus14')
+            break;
+        else
+            rethrow(err);
+        end
+    end
     
     if ((abs(imag(mu1)) <= pi/per) && (abs(mu1 - lasteig)/abs(lasteig) > 0.001))
         if (~isreal(mu1))
@@ -30,6 +38,8 @@ while (n < P)
     
     if (real(mu1) < minexp)
         break;
+    elseif ((guess > 0) && (guess < 1))
+        guess = -0.1;
     else
         guess = opt.mult * guess;
     end

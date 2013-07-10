@@ -45,7 +45,7 @@ switch opt.method
                 ftrn = fcn(0,fp);
 
                 if (~opt.fixedperiod)
-                    odeopt = odeset(odeopt, 'Events',@(t,x) istransverse(t,x, fp,ftrn));
+                    odeopt = odeset(odeopt, 'Events',@(t,x) istransverse(t,x, fp,ftrn, 0.25*diff(tspan)));
                 end
                 sol = ode45(fcn, tspan, fp, odeopt);
             case 'implicit',
@@ -62,7 +62,7 @@ switch opt.method
                 ftrn = fpd;
                 
                 if (~opt.fixedperiod)
-                    odeopt = odeset(odeopt, 'Events',@(t,x,xp) istransverse(t,x, fp,ftrn));
+                    odeopt = odeset(odeopt, 'Events',@(t,x,xp) istransverse(t,x, fp,ftrn, 0.25*diff(tspan)));
                 end
                 sol = ode15i(fcn, tspan, fp, fpd, odeopt);
         end
@@ -90,11 +90,11 @@ function dx = returnval(x0, fcn, tspan, odeopt, isfixper)
 
 if ~isfixper
     ftrn = fcn(0,x0);
-    odeopt = odeset(odeopt, 'Events',@(t,x) istransverse(t,x, x0,ftrn));
+    odeopt = odeset(odeopt, 'Events',@(t,x) istransverse(t,x, x0,ftrn, 0.25*diff(tspan)));
 end
 sol = ode45(fcn, tspan, x0, odeopt);
 
-if (isfield(sol,'ye'))
+if (isfield(sol,'ye') && ~isempty(sol.ye))
     dx = sol.ye(:,end) - x0;
 else
     dx = sol.y(:,end) - x0;
@@ -111,7 +111,7 @@ xp0(~isimp) = -eqn(~isimp);
 
 if ~isfixper
     ftrn = xp0;
-    odeopt = odeset(odeopt, 'Events',@(t,x,xp) istransverse(t,x, x0,ftrn));
+    odeopt = odeset(odeopt, 'Events',@(t,x,xp) istransverse(t,x, x0,ftrn, 0.25*diff(tspan)));
 end
 sol = ode15i(fcn, tspan, x0, xp0, odeopt);
 
@@ -121,12 +121,12 @@ else
     dx = sol.y(:,end) - x0;
 end
 
-function [value,isterminal,direction] = istransverse(t,x, v0,ftrn)
+function [value,isterminal,direction] = istransverse(t,x, v0,ftrn, minper)
 
 v = x(1:length(v0));
 value = ftrn' * (v-v0);
 direction = 1;
-isterminal = 1;
+isterminal = t > minper;
 
 
 

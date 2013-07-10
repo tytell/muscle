@@ -7,6 +7,17 @@ icp = zeros(size(ics));
 eqn = odefcn(0,ics',icp');
 icp(~isimp) = -eqn(~isimp);
 
-[~,icp] = decic(odefcn, 0, ics',zeros(size(ics))', icp',~isimp);
-icp = icp';
+[impic,impicp] = decic(@(t,x,xp) odefcnreduced(t,x,xp, odefcn,ics',icp',isimp), 0, ...
+    ics(isimp)',ones(sum(isimp),1), icp(isimp)',[]);
+%ic(isimp) = impic;
+icp(isimp) = impicp';
+
+
+function eqn = odefcnreduced(t,x,xp, odefcn,ic0,icp0,isimp)
+
+ic0(isimp) = x;
+icp0(isimp) = xp;
+
+eqn1 = odefcn(t,ic0,icp0);
+eqn = eqn1(isimp);
 
