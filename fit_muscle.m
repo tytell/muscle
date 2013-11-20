@@ -86,14 +86,15 @@ clf;
 hax = gca;
 
 mtest = [0.005 0.01 0.1 1 2 5];
-btest = [0.1 0.5 1 5 10 50 100 500 1000];
+btest = [0.1 0.5 1 5 10 50 100 500];
 
 if (~getvar('dx','Pcmod','Pcdata') || inputyn('Do overview simulation again?'))
     n = length(mtest)*length(btest);
     t0 = (0:0.01:1)';
     
     [mvals,bvals] = ndgrid(mtest,btest);
-    if (exist('dx','var') && exist('Pcmod','var'))
+    if (exist('dx','var') && exist('Pcmod','var') && ...
+            all(size(dx) == [length(t0) size(mvals,1) size(mvals,2)]))
         dotest = squeeze(any(~isfinite(dx),1));
     else
         dotest = true(size(mvals));
@@ -102,12 +103,13 @@ if (~getvar('dx','Pcmod','Pcdata') || inputyn('Do overview simulation again?'))
     end
     
     [ii,jj] = find(dotest);
+   
     for k = 1:length(ii)
         i = ii(k);
         j = jj(k);
         fprintf('%d/%d (%d%%): m = %g, b = %g\n', k,n, round(k/n*100), mtest(i),btest(j));
             
-        [dx1,Pc11,Pcdata] = fitfcn([mtest(i); btest(j)], hax);
+        [dx1,Pc11,Pcdata] = fitfcn([mtest(i); btest(j)], []);
         dx(:,i,j) = dx1;
         Pcmod(:,i,j) = Pc11;
             
@@ -124,8 +126,8 @@ return;
 
         
 optopt = optimset('Display','iter-detailed','FunValCheck','on', ...
-    'Algorithm','levenberg-marquardt');
-param = lsqnonlin(@(p) fitfcn(p,hax), [mm; b], [], [], optopt);
+    'Algorithm','levenberg-marquardt', 'UseParallel','always');
+param = lsqnonlin(@(p) fitfcn(p,[]), [mm; b], [], [], optopt);
 return;
 
 if (~getvar('fitdata') || ~inputyn('Use existing fit data?', 'default',true))
