@@ -1,45 +1,44 @@
 function fit_muscle
 
-T = 1;              % sec
-mu0 = 1;
-mu1 = 23;
-lambda2 = -20;
-C = 2;
-S = 6;
-P0 = 67;         % mN / mm^2
-L0 = 2.94;       % mm
-xsec = 1;           % mm^2
-L1 = 2.682/L0;
+par.T = 1;              % sec
+par.mu0 = 1;
+par.mu1 = 23;
 
-k1 = 9;  
-k2 = 50; 
-k30 = 40;
-k40 = 19.5; 
-km1 = 5;
-km2 = 10;
-k5 = 100;
+par.lambda2 = -20;
+par.C = 2;
+par.S = 6;
+par.P0 = 67;         % mN / mm^2
+par.L0 = 2.94;       % mm
+par.xsec = 1;           % mm^2
+par.L1 = 2.682/par.L0;
 
-b = 10;
-mm = 0.5;
+par.k1 = 9;  
+par.k2 = 50; 
+par.k30 = 40;
+par.k40 = 19.5; 
+par.km1 = 5;
+par.km2 = 10;
+par.k5 = 100;
 
-alpham = 0.8;
-alphap = 2.9;
-alphamax = 1.8;
+par.b = 10;
+par.mm = 0.5;
 
-s = 0.05;
+par.alpham = 0.8;
+par.alphap = 2.9;
+par.alphamax = 1.8;
+
+par.s = 0.05;
 
 phi = 0.1;
-T = 1;
-actdur = 0.36;
-A = 0.125;
-A1 = A/L0;
+par.actdur = 0.36;
+par.A = 0.125/par.L0;
 
 datafile = 'MuscleData/s15sines.mat';
 musc = load(datafile);
 
-act = @(t) mod(t,1) < 0.36;
-L = @(t) 1 + A1 * cos(2*pi * (t - phi));
-V = @(t) -2*pi * A1 * sin(2*pi * (t - phi));
+par.act = @(t) mod(t,1) < par.actdur;
+par.L = @(t) 1 + A1 * cos(2*pi * (t - phi));
+par.V = @(t) -2*pi * A1 * sin(2*pi * (t - phi));
 
 dt = 0.005;
 phitest = 0:0.05:0.95;
@@ -47,81 +46,97 @@ showphi = [1 6 11 17];
 
 pertmag = 0.1;
 
-t = (0:0.01:3)';
-% 
-% if (~getvar('timedata') || ~inputyn('Use existing data?', 'default',true))
-%     timedata = struct([]);
-%     for i = 1:length(phitest)
-%         phi = phitest(i);
-%         fprintf('%d/%d.  Phi = %g\n', i,length(phitest), phi);
-%         
-%         A = 0.125/2;
-%         L = @(t) L0 + A * cos(2*pi/T * (t - phi));
-%         V = @(t) -2*pi/T * A * sin(2*pi/T * (t - phi));
-%         X0 = [ls0   0   0   0];
-%         
-%         %options for ode
-%         odeopt = odeset('RelTol',1e-6);%, 'OutputFcn',@odeplot);
-%         sol = ode45(@odefcn, t([1 end]), X0, odeopt);
-% 
-%         x1 = deval(sol,t);
-%         data1.t = t;
-%         data1.x = x1';
-%         data1.lc = L(t) - data1.x(:,1);
-%         data1.vc = V(t) - data1.x(:,2);
-%         data1.Pc = Pc(data1.lc, data1.vc, data1.x(:,4));
-%         data1.L = L;
-%         data1.V = V;
-%         timedata = makestructarray(timedata,data1);
-%     end
-%     putvar timedata;
-% end
-% 
-% figureseries('Force vs phase');
-% Pcall = cat(2,timedata.Pc);
-% plot(t, Pcall);
-
 figureseries('Fit model');
 clf;
 hax = gca;
 
 mtest = [0.005 0.01 0.1 1 2 5];
+<<<<<<< HEAD
 btest = [0.1 0.5 1 5 10 50 100 500];
+=======
+btest = [0.1 0.5 1 5 10 50 100];
+
+t0 = (0:0.01:1)';
+par.t = t0;
+>>>>>>> 3fc21c7b2aab31503370eda9f7e33be60421cc72
 
 if (~getvar('dx','Pcmod','Pcdata') || inputyn('Do overview simulation again?'))
-    n = length(mtest)*length(btest);
-    t0 = (0:0.01:1)';
+    N = length(mtest)*length(btest);
     
     [mvals,bvals] = ndgrid(mtest,btest);
     if (exist('dx','var') && exist('Pcmod','var') && ...
-            all(size(dx) == [length(t0) size(mvals,1) size(mvals,2)]))
-        dotest = squeeze(any(~isfinite(dx),1));
+            all(size(dx) == [length(t0) size(mvals,1) size(mvals,2) 2]))
+        dotest = squeeze(any(~isfinite(dx(:,:,1)),1));
     else
         dotest = true(size(mvals));
-        dx = zeros(length(t0)*length(musc.phi),length(mtest),length(btest));
-        Pcmod = zeros(length(t0)*length(musc.phi),length(mtest),length(btest));
+        dx = zeros(length(t0)*length(musc.phi),length(mtest),length(btest),3);
+        Pcmod = zeros(length(t0)*length(musc.phi),length(mtest),length(btest),3);
     end
     
+    par.model = 'old';
+    par.phi = musc.phi;
+
+    par.tdat = musc.tdata;
+    par.Pdat = musc.Fdata;
+    
     [ii,jj] = find(dotest);
-   
+    dx0 = zeros(length(t0)*length(par.phi),length(ii),2);
+    Pcmod0 = zeros(length(t0)*length(par.phi),length(jj),2);
+
+    n = NaN(length(t0),length(par.phi));
+    zdata = struct('x',n(:,:,[1 1 1 1 1]),'A',NaN,'L',n,'V',n,'lc',n,'vc',n,'Pc',n,'Pcdat',n);
+    data0 = repmat(zdata,[1 length(ii) 3]);
+
     for k = 1:length(ii)
         i = ii(k);
         j = jj(k);
-        fprintf('%d/%d (%d%%): m = %g, b = %g\n', k,n, round(k/n*100), mtest(i),btest(j));
-            
-        [dx1,Pc11,Pcdata] = fitfcn([mtest(i); btest(j)], []);
-        dx(:,i,j) = dx1;
-        Pcmod(:,i,j) = Pc11;
-            
-        fprintf('   --> lsq = %g\n', sum(dx(:,i,j).^2,1));
-        putvar dx Pcmod Pcdata;
-    end
-end
+
+        par.model = 'lc';
+        [dx1,Pc11,data1] = fit_muscle_fcn([mtest(i); btest(j)], @muscle_ode_fcn, par);
+        dx0(:,k,1) = dx1;
+        Pcmod0(:,k,1) = Pc11;
+        data0(1,k,1) = data1;
         
+        par.model = 'ls';
+        [dx1,Pc11,data1] = fit_muscle_fcn([mtest(i); btest(j)], @muscle_ode_fcn, par);
+        dx0(:,k,2) = dx1;
+        Pcmod0(:,k,2) = Pc11;
+        data0(1,k,2) = data1;
+        
+        fprintf('%d/%d (%d%%): m = %g, b = %g\n', k,N, round(k/N*100), mtest(i),btest(j));
+        fprintf('   --> lsq = ');
+        fprintf('%g ', nansum(dx0(:,k,:).^2,1));
+        fprintf('\n');
+    end
+
+    data = repmat(zdata,[length(mtest) length(btest) 3]);
+    for k = 1:length(ii)
+        dx(:,ii(k),jj(k),:) = dx0(:,k,:);
+        Pcmod(:,ii(k),jj(k),:) = Pcmod0(:,k,:);
+        data(ii(k),jj(k),:) = data0(1,k,:);
+    end
+    
+    par.model = 'old';
+    [dxold,Pcold,dataold] = fit_muscle_fcn([mtest(i); btest(j)], @muscle_ode_fcn, par);
+end
+    
+Pcold = zeros(length(t0),size(musc.Fmod,2));
+for i = 1:size(musc.Fmod,2)
+    Pcold(:,i) = interp1(musc.tmod,musc.Fmod(:,i), t0);
+end
+Pcold = Pcold(:);
+dxold = Pcdata - Pcold;
+
+lsqold = sum(dxold.^2);
+
 lsq = sum(dx.^2,1);
 lsq = squeeze(lsq);
 pcolor(log10(btest),log10(mtest),lsq);
-
+xtick(log10(btest), cellfun(@num2str,num2cell(btest),'UniformOutput',false));
+ytick(log10(mtest), cellfun(@num2str,num2cell(mtest),'UniformOutput',false));
+xlabel('B');
+ylabel('m');
+colorbar;
 return;
 
         
@@ -142,7 +157,7 @@ if (~getvar('fitdata') || ~inputyn('Use existing fit data?', 'default',true))
         A1 = 0.125/2 / L0;
         L = @(t) 1 + A1 * cos(2*pi * (t - phi));
         V = @(t) -2*pi * A1 * sin(2*pi * (t - phi));
-        X0 = [0   0   0   0   1];
+        X0 = [1+A1   0   0   0   1];
         
         %options for ode
         odeopt = odeset('RelTol',1e-6); %, 'OutputFcn',@odeplot);
@@ -185,196 +200,7 @@ for i = 1:size(Pcmod,2)
     addplot(hax(2),fitdata(1).t+i-1, fitdata(i).vc,'g-');
 end
 
-    function [hx,dhx] = h(x)
-        
-        exs = exp(x/s);
-        hx = s * log(1 + exs);
-        if (nargout == 2)
-            dhx = exs ./ (1 + exs);
-        end
-        
-    end
 
-    function gx = g(x)
-        
-        gx = 1./(1+exp(-2*(x-0.5)/s));
-    end
-
-    function [hl,dl] = lambda(lc)
-        
-        l0 = 1 + lambda2 * (lc - 1).^2;
-        if (nargout == 1)
-            hl = h(l0);
-        else
-            [hl,dhl] = h(l0);
-            dl = 2.*lambda2.*(lc - 1) .* dhl;
-        end
-        
-    end
-
-    function [x,dx] = alpha(vc)
-        
-        if (nargout == 1)
-            x = zeros(size(vc));
-            x(vc >= 0) = 1 + alphap * vc(vc >= 0);
-            x(vc < 0) = 1 + alpham * vc(vc < 0);
-            x(vc > alphamax) = alphamax;
-            %x0 = 1 + alphap * h(vc) - alpham * h(-vc);
-            %x = h(x0);
-            %x = alphamax - h(alphamax - x);
-        else
-            [hvcp,dhvcp] = h(vc);
-            [hvcm,dhvcm] = h(-vc);
-            x0 = 1 + alphap * hvcp - alpham * hvcm;
-            [x,dhx] = h(x0);
-            
-            dx = (alpham .* dhvcm + alphap .* dhvcp) .* ...
-                dhx;
-        end
-        
-    end
-
-    function x = mu(Caf)
-        
-        x = mu0 + mu1*Caf;
-        
-    end
-
-    function p = Pc(lc, vc, Caf)
-        
-        p = lambda(lc) .* alpha(vc) .* Caf;
-        
-    end
-
-    function dx = odefcn1(t,x)
-        
-        ls = x(1,:);
-        vs = x(2,:);
-        Ca = x(3,:);
-        Caf = x(4,:);
-        m = x(5,:);
-        
-        actval = act(t);
-        Lval = L(t);
-        Vval = V(t);
-        
-        lc = Lval - ls;
-        vc = Vval - vs;
-        
-        gact = actval; %g(actval);
-
-        Pcval = Pc(lc,vc,Caf);
-        
-        dm = km1*Pcval*h(-vc) - km2*(m-1)*g(vc+0.5);
-        
-        k3 = k30 / sqrt(m);
-        k4 = k40 * sqrt(m);
-        
-        dCaf = (k3 * Ca - k4 * Caf) .* (1 - Caf);
-        dCa = (k4 * Caf - k3 * Ca) .* (1 - Caf) + ...
-            gact .* k1 .* (C - Ca - Caf) + ...
-            (1 - gact) .* k2 .* Ca .* (C - S - Ca - Caf);
-        dls = vs;
-        
-        muval = mu(Caf);
-        
-        dvs = 1/mm * (Pcval - b*vs - muval*ls);
-        
-        dx = [dls; dvs; dCa; dCaf; dm];
-        
-    end
-
-    function dx = odefcn2(t,x)
-        
-        P = x(1,:);
-        Ca = x(3,:);
-        Caf = x(4,:);
-        m = x(5,:);
-        
-        actval = act(t);
-        Lval = L(t);
-        Vval = V(t);
-        
-        gact = actval; %g(actval);
-
-        k3 = k30 / sqrt(m);
-        k4 = k40 * sqrt(m);
-        
-        dCaf = (k3 * Ca - k4 * Caf) .* (1 - Caf);
-        dCa = (k4 * Caf - k3 * Ca) .* (1 - Caf) + ...
-            gact .* k1 .* (C - Ca - Caf) + ...
-            (1 - gact) .* k2 .* Ca .* (C - S - Ca - Caf);
-        
-        muval = mu(Caf);
-
-        lc = Lval - P/muval;
-        vc_sign = muval.* Vval - k5*(Caf.*lambda(lc) - P) + P.*mu1./muval.*dCaf;
-        if (vc_sign < 0)
-            alpha1 = alpham;
-        else
-            alpha1 = alphap;
-        end
-        
-        vc = vc_sign./(muval + k5.*Caf.*lambda(lc).*alpha1);
-
-        Pcval = Pc(lc,vc,Caf);
-        dP = k5*(Pcval-P);
-        
-        %dP = (lambda(lc) * Caf * (1 + alpha1*Vval + alpha1*mu1*P * dCaf/muval^2) - P) / ...
-        %    (1/k5 + lambda(lc) * alpha1 * Caf/muval);
-                
-        dm = km1*Pcval*h(-vc) - km2*(m-1)*g(vc+0.5);
-        
-        dx = [dP; 0; dCa; dCaf; dm];
-        
-    end
-
-    function [dx,Pcmb,Pcdat] = fitfcn(param, hax)
-
-        mm = param(1);
-        b = param(2);
-        
-        t1 = (0:0.01:1)';
-        phitest1 = musc.phi;
-        
-        if (~isempty(hax))
-            cla(hax,'reset');
-            axis([0 length(phitest1) -1 1.8]);
-            title(sprintf('mm = %f, b = %f',mm,b));
-        end
-        dx = zeros(length(t1),length(phitest1));
-        Pcmb = zeros(length(t1),length(phitest1));
-        Pcdat = zeros(length(t1),length(phitest1));
-        for iff = 1:length(phitest1)
-            phi1 = phitest1(iff);
-
-            A1 = 0.125 / L0;
-            L = @(t) L1 + A1 * cos(2*pi * (t - phi1));
-            V = @(t) -2*pi * A1 * sin(2*pi * (t - phi1));
-            X0 = [0   0   0   0   1];
-
-            %options for ode
-            odeopt = odeset('RelTol',1e-5); %, 'OutputFcn',@odeplot);
-            sol1 = ode23(@odefcn1, [0 t(end)+1], X0, odeopt);
-
-            x1 = deval(sol1,t1+1);
-            x1 = x1';
-            lc1 = L(t1) - x1(:,1);
-            vc1 = V(t1) - x1(:,2);
-            Pcmb(:,iff) = Pc(lc1, vc1, x1(:,4));
-            Pcdat(:,iff) = interp1(musc.tdata,musc.Fdata(:,iff), t1) / P0;
-            Pcdat(isnan(Pcdat(:,iff)),iff) = 0;
-            
-            dx(:,iff) = Pcmb(:,iff) - Pcdat(:,iff);
-            if (~isempty(hax))
-                addplot(hax,t1+iff-1,Pcmb(:,iff), t1+iff-1,Pcdat(:,iff), t1+iff-1,dx(:,iff));
-                drawnow;
-            end
-        end
-        dx = dx(:);
-        Pcmb = Pcmb(:);
-        Pcdat = Pcdat(:);
-    end        
 end
 
   
