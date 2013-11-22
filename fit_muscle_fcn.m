@@ -24,7 +24,7 @@ for i = 1:length(phitest1)
             X0 = [par.L1+A1   0   0   0   1];
         case 'ls'
             X0 = [0   0   0   0   1];
-        case 'old'
+        case {'old','old2'}
             X0 = [0   0   0   0   1];
     end
     

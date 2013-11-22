@@ -9,19 +9,21 @@ par.C = 2;
 par.S = 6;
 par.P0 = 67;         % mN / mm^2
 par.L0 = 2.94;       % mm
+par.Lis = 2.7;
 par.xsec = 1;           % mm^2
-par.L1 = 2.682/par.L0;
+par.L1 = 2.7/par.L0;
+par.lc0 = 0.85; 
 
 par.k1 = 9;  
 par.k2 = 50; 
 par.k30 = 40;
-par.k40 = 19.5; 
-par.km1 = 5;
+par.k40 = 19.4; 
+par.km1 = 15;
 par.km2 = 10;
 par.k5 = 100;
 
-par.b = 10;
-par.mm = 0.5;
+par.b = 0.02;
+par.mm = 0.005;
 
 par.alpham = 0.8;
 par.alphap = 2.9;
@@ -48,10 +50,9 @@ pertmag = 0.1;
 
 hax = gca;
 
-mtest = [0.005 0.01 0.1 1 2 5];
-btest = [0.1 0.5 1 5 10 50 100];
+mtest = [0.01 0.02 0.05 0.1];
+btest = [0 0.01 0.05 0.1 0.5];
 
-par.model = 'old';
 par.phi = musc.phi;
 
 par.tdat = musc.tdata;
@@ -59,6 +60,56 @@ par.Pdat = musc.Fdata;
 
 t0 = (0:0.01:1)';
 par.t = t0;
+
+% test isometric first
+A1 = 0.125 / par.L0;
+phi1 = 0.2;
+par.L = @(t) par.L1; % + A1 * cos(2*pi * (t - phi1));
+par.V = @(t) 0; %-2*pi * A1 * sin(2*pi * (t - phi1));
+%par.mu0 = par.mu0 + par.mu1;
+%par.mu1 = 0;
+X0 = [0   0   0   0   1];
+
+%options for ode
+par.model = 'ls';
+odeopt = odeset('RelTol',1e-5); %, 'OutputFcn',@odeplot);
+sol1 = ode45(@(t,x) muscle_ode_fcn(t,x,par), [0 t0(end)+1], X0, odeopt);
+
+t2 = (0:0.01:2)';
+x2 = deval(sol1,t2);
+
+[~,lc2,vc2,Pc2] = muscle_ode_fcn(t2',x2,par);
+x2 = x2';
+lc2 = lc2';
+vc2 = vc2';
+Pc2 = Pc2';
+
+phi1 = 0.2;
+par.L = @(t) par.L1 + A1 * cos(2*pi * (t - phi1));
+par.V = @(t) -2*pi * A1 * sin(2*pi * (t - phi1));
+
+par.model = 'ls';
+odeopt = odeset('RelTol',1e-5); %, 'OutputFcn',@odeplot);
+solnew = ode45(@(t,x) muscle_ode_fcn(t,x,par), [0 t0(end)+1], X0, odeopt);
+
+xnew = deval(solnew,t2);
+[~,lcn,vcn,Pcn] = muscle_ode_fcn(t2',xnew,par);
+
+par.model = 'old2';
+solold = ode45(@(t,x) muscle_ode_fcn(t,x,par), [0 t0(end)+1], X0, odeopt);
+
+xold = deval(solold,t2);
+[~,lco,vco,Pco] = muscle_ode_fcn(t2',xold,par);
+
+xnew = xnew';
+lcn = lcn';
+vcn = vcn';
+Pcn = Pcn';
+
+xold = xold';
+lco = lco';
+vco = vco';
+Pco = Pco';
 
 load fit_muscle.mat
 if (~exist('dx0','var') || any(all(flatten(~isnan(dx0),2:4))) || ...
