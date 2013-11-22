@@ -114,6 +114,56 @@ switch par.model
         
         dx = [dP; zeros(size(dP)); dCa; dCaf; dm];
         
+    case 'old2'
+        
+        P = x(1,:);
+        Ca = x(3,:);
+        Caf = x(4,:);
+        m = x(5,:);
+        
+        actval = par.act(t);
+        Lval = par.L(t);
+        Vval = par.V(t);
+        
+        gact = actval; %g(actval);
+
+        k3 = par.k30 ./ sqrt(m);
+        k4 = par.k40 .* sqrt(m);
+        
+        dCaf = (k3 .* Ca - k4 .* Caf) .* (1 - Caf);
+        dCa = (k4 .* Caf - k3 .* Ca) .* (1 - Caf) + ...
+            gact .* par.k1 .* (par.C - Ca - Caf) + ...
+            (1 - gact) .* par.k2 .* Ca .* (par.C - par.S - Ca - Caf);
+        
+        muval = mu(Caf, par);
+        
+        lc = Lval - P./muval;
+        lambdaval = lambda(lc,par);
+        
+        %estimate sign of vc
+        %first estimate dP, assuming that vc is zero
+        Pc0 = lambdaval .* Caf;
+        dP0 = par.k5 * (Pc0 - P);
+        vc_sign = muval .* Vval - dP0 + par.mu1.*P.*dCaf ./ muval;
+        
+        if (vc_sign < 0)
+            alpha1 = par.alpham;
+        else
+            alpha1 = par.alphap;
+        end
+        
+        dP = (lambda(lc,par) .* Caf .* ...
+            (1 + alpha1*Vval + alpha1*par.mu1*P.*dCaf./muval.^2) - P) ./ ...
+            (1/par.k5 + lambda(lc,par).*alpha1.*Caf./muval);
+        vc = Vval - dP./muval + par.mu1 .* P .* dCaf ./ muval.^2;
+        
+        Pcval = Pc0 .* alpha(vc,par);
+        
+        dm = zeros(size(vc));
+        dm(vc < 0) = -par.km1 .* Pcval(vc < 0) .* vc(vc < 0);
+        dm(vc >= 0) = -par.km2 .* (m(vc >= 0) - 1);
+        
+        dx = [dP; zeros(size(dP)); dCa; dCaf; dm];
 end
 
 
@@ -140,13 +190,15 @@ gx = 1./(1+exp(-2*(x-0.5)/par.s));
 
 function [hl,dl] = lambda(lc, par)
 
-l0 = 1 + par.lambda2 * (lc - 1).^2;
-if (nargout == 1)
-    hl = h(l0, par);
-else
-    [hl,dhl] = h(l0, par);
-    dl = 2.*par.lambda2.*(lc - 1) .* dhl;
-end
+l0 = 1 + par.lambda2 * (lc - par.lc0).^2;
+hl = l0;
+hl(hl < 0) = 0;
+% if (nargout == 1)
+%     hl = h(l0, par);
+% else
+%     [hl,dhl] = h(l0, par);
+%     dl = 2.*par.lambda2.*(lc - 1) .* dhl;
+% end
 
 function [x,dx] = alpha(vc, par)
 
