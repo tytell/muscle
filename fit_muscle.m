@@ -12,7 +12,7 @@ par.L0 = 2.94;       % mm
 par.Lis = 2.7;
 par.xsec = 1;           % mm^2
 par.L1 = 2.7/par.L0;
-par.lc0 = 0.85; 
+par.lc0 = 1-(par.L0-par.Lis)/par.L0; 
 
 par.k1 = 9;  
 par.k2 = 50; 
@@ -64,14 +64,14 @@ par.t = t0;
 % test isometric first
 A1 = 0.125 / par.L0;
 phi1 = 0.2;
-par.L = @(t) par.L1; % + A1 * cos(2*pi * (t - phi1));
+par.L = @(t) 0; % + A1 * cos(2*pi * (t - phi1));
 par.V = @(t) 0; %-2*pi * A1 * sin(2*pi * (t - phi1));
 %par.mu0 = par.mu0 + par.mu1;
 %par.mu1 = 0;
 X0 = [0   0   0   0   1];
 
 %options for ode
-par.model = 'ls';
+par.model = 'old2';
 odeopt = odeset('RelTol',1e-5); %, 'OutputFcn',@odeplot);
 sol1 = ode45(@(t,x) muscle_ode_fcn(t,x,par), [0 t0(end)+1], X0, odeopt);
 
@@ -85,7 +85,7 @@ vc2 = vc2';
 Pc2 = Pc2';
 
 phi1 = 0.2;
-par.L = @(t) par.L1 + A1 * cos(2*pi * (t - phi1));
+par.L = @(t) 0 + A1 * cos(2*pi * (t - phi1));
 par.V = @(t) -2*pi * A1 * sin(2*pi * (t - phi1));
 
 par.model = 'ls';
@@ -95,6 +95,7 @@ solnew = ode45(@(t,x) muscle_ode_fcn(t,x,par), [0 t0(end)+1], X0, odeopt);
 xnew = deval(solnew,t2);
 [~,lcn,vcn,Pcn] = muscle_ode_fcn(t2',xnew,par);
 
+par.L = @(t) 0 + A1 * cos(2*pi * (t - phi1));
 par.model = 'old2';
 solold = ode45(@(t,x) muscle_ode_fcn(t,x,par), [0 t0(end)+1], X0, odeopt);
 

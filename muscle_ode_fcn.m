@@ -127,43 +127,38 @@ switch par.model
         
         gact = actval; %g(actval);
 
+        muval = mu(Caf, par);
+
+        lc = Lval - P./muval;
+        lambdaval = lambda(lc,par);
+
+        k1 = par.k1 .* gact;
+        k2 = par.k2 .* (1-gact);
         k3 = par.k30 ./ sqrt(m);
         k4 = par.k40 .* sqrt(m);
         
-        dCaf = (k3 .* Ca - k4 .* Caf) .* (1 - Caf);
-        dCa = (k4 .* Caf - k3 .* Ca) .* (1 - Caf) + ...
-            gact .* par.k1 .* (par.C - Ca - Caf) + ...
-            (1 - gact) .* par.k2 .* Ca .* (par.C - par.S - Ca - Caf);
+        xboth = (1-Caf) .* (k3.*Ca - k4.*Caf);
+        dCaf = xboth;
+        dCa = k1 .* (par.C - Ca - Caf) + ...
+            k2 .* Ca .* (par.C - par.S - Ca - Caf) - xboth;
         
-        muval = mu(Caf, par);
+        vc_sign = muval .* Vval - par.k5*(Caf.*lambdaval-P) + ...
+            P.*par.mu1./muval.*xboth; %for var.mu
+
+        a1 = par.alpham*(vc_sign<=0) + par.alphap*(vc_sign>0);
         
-        lc = Lval - P./muval;
-        lambdaval = lambda(lc,par);
+        vc = vc_sign./(muval + par.k5.*Caf.*lambdaval.*a1);
         
-        %estimate sign of vc
-        %first estimate dP, assuming that vc is zero
-        Pc0 = lambdaval .* Caf;
-        dP0 = par.k5 * (Pc0 - P);
-        vc_sign = muval .* Vval - dP0 + par.mu1.*P.*dCaf ./ muval;
+        dW = -vc.*P;
         
-        if (vc_sign < 0)
-            alpha1 = par.alpham;
-        else
-            alpha1 = par.alphap;
-        end
+        dm = (dW > 0).*(par.km1*dW)+ (dW<=0).*(par.km2*(1-m));
         
-        dP = (lambda(lc,par) .* Caf .* ...
-            (1 + alpha1*Vval + alpha1*par.mu1*P.*dCaf./muval.^2) - P) ./ ...
-            (1/par.k5 + lambda(lc,par).*alpha1.*Caf./muval);
-        vc = Vval - dP./muval + par.mu1 .* P .* dCaf ./ muval.^2;
+        alphaval = min(par.alphamax,max(0,1+a1.*vc));
+        Pcval=Caf.*lambdaval.*alphaval;
         
-        Pcval = Pc0 .* alpha(vc,par);
-        
-        dm = zeros(size(vc));
-        dm(vc < 0) = -par.km1 .* Pcval(vc < 0) .* vc(vc < 0);
-        dm(vc >= 0) = -par.km2 .* (m(vc >= 0) - 1);
-        
-        dx = [dP; zeros(size(dP)); dCa; dCaf; dm];
+        dP = par.k5*(Pcval-P);
+
+        dx = [dP; dW; dCa; dCaf; dm];
 end
 
 
