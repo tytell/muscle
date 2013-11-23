@@ -53,7 +53,7 @@ for i = 1:length(phitest1)
     data.Pc(:,i) = Pc1;
     data.Pcdat(:,i) = Pcdat(:,i);
 
-    dx(:,i) = Pcmb(:,i) - Pcdat(:,i);
+    dx(:,i) = max(Pcmb(:,i)) - max(Pcdat(:,i));
 end
 dx(isnan(dx)) = 0;
 dx = dx(:);
