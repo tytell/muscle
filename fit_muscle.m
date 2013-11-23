@@ -50,8 +50,8 @@ pertmag = 0.1;
 
 hax = gca;
 
-mtest = [0.01 0.02 0.05 0.1];
-btest = [0 0.01 0.05 0.1 0.5];
+mtest = [0.005 0.01 0.02 0.05 0.1];
+btest = [0 0.01 0.05 0.1 0.5 1 2];
 
 par.phi = musc.phi;
 
@@ -111,6 +111,14 @@ lco = lco';
 vco = vco';
 Pco = Pco';
 
+figureseries('0.2 comparison');
+subplot(2,1,1);
+plot(t2,Pcn, t2,Pco, musc.tmod,musc.Fmod(:,3)/par.P0, musc.tdata,musc.Fdata(:,3)/par.P0);
+legend('new','old','Thelma','data');
+
+subplot(2,1,2);
+plot(t2,vcn, t2,vco);
+
 load fit_muscle.mat
 if (~exist('dx0','var') || any(all(flatten(~isnan(dx0),2:4))) || ...
         inputyn('Do overview simulation again?'))
@@ -140,7 +148,7 @@ if (~exist('dx0','var') || any(all(flatten(~isnan(dx0),2:4))) || ...
         i = ii(k);
         j = jj(k);
 
-        [dx1,Pc11,data1] = fit_muscle_fcn([mtest(i); btest(j)], @muscle_ode_fcn, par);
+        [dx1,Pc11,data1] = fit_muscle_fcn([mtest(i); btest(j); par.lc0], @muscle_ode_fcn, par);
         dx0(:,k,1) = dx1;
         Pcmod0(:,k,1) = Pc11;
         data0(1,k,1) = data1;
@@ -160,7 +168,7 @@ if (~exist('dx0','var') || any(all(flatten(~isnan(dx0),2:4))) || ...
         i = ii(k);
         j = jj(k);
 
-        [dx1,Pc11,data1] = fit_muscle_fcn([mtest(i); btest(j)], @muscle_ode_fcn, par);
+        [dx1,Pc11,data1] = fit_muscle_fcn([mtest(i); btest(j); par.lc0], @muscle_ode_fcn, par);
         dx0(:,k,2) = dx1;
         Pcmod0(:,k,2) = Pc11;
         data0(1,k,2) = data1;
@@ -200,7 +208,7 @@ ytick(log10(mtest), cellfun(@num2str,num2cell(mtest),'UniformOutput',false));
 xlabel('B');
 ylabel('m');
 title('lc model');
-caxis([0 2]);
+caxis auto;
 colorbar;
 
 subplot(2,1,2);
@@ -211,7 +219,7 @@ xlabel('B');
 ylabel('m');
 colorbar;
 title('ls model');
-caxis([0 2]);
+caxis auto;
 
 [~,ind1] = min(flatten(lsq(:,:,1)));
 [~,ind2] = min(flatten(lsq(:,:,2)));
@@ -230,11 +238,14 @@ for k = 1:10
     addplot(t0+k-1,dataold.Pc(:,k), 'r-', ...
         musc.tmod+k-1, musc.Fmod(:,k)/par.P0, 'm-');
 end
-return
 
+fprintf('Start at m = %f, b = %f\n', mtest(i2),btest(j2));
 optopt = optimset('Display','iter-detailed','FunValCheck','on', ...
-    'Algorithm','levenberg-marquardt', 'UseParallel','always');
-param = lsqnonlin(@(p) fitfcn(p,[]), [mm; b], [], [], optopt);
+    'UseParallel','always');
+param = lsqnonlin(@(p) fit_muscle_fcn(p,@muscle_ode_fcn,par), [mtest(i2); btest(j2); par.lc0], [0; 0; 0.8], [1; 2; 1], optopt);
+
+disp(param);
+
 return;
 
 if (~getvar('fitdata') || ~inputyn('Use existing fit data?', 'default',true))
