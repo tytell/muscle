@@ -12,7 +12,7 @@ par.L0 = 2.94;       % mm
 par.Lis = 2.7;
 par.xsec = 1;           % mm^2
 par.L1 = 2.7/par.L0;
-par.lc0 = 1-(par.L0-par.Lis)/par.L0; 
+par.lc0 = 0.85; %1-(par.L0-par.Lis)/par.L0; 
 
 par.k1 = 9;  
 par.k2 = 50; 
@@ -85,7 +85,7 @@ vc2 = vc2';
 Pc2 = Pc2';
 
 phi1 = 0.2;
-par.L = @(t) 0 + A1 * cos(2*pi * (t - phi1));
+par.L = @(t) par.L1 + A1 * cos(2*pi * (t - phi1));
 par.V = @(t) -2*pi * A1 * sin(2*pi * (t - phi1));
 
 par.model = 'ls';
@@ -95,7 +95,7 @@ solnew = ode45(@(t,x) muscle_ode_fcn(t,x,par), [0 t0(end)+1], X0, odeopt);
 xnew = deval(solnew,t2);
 [~,lcn,vcn,Pcn] = muscle_ode_fcn(t2',xnew,par);
 
-par.L = @(t) 0 + A1 * cos(2*pi * (t - phi1));
+par.L = @(t) par.L1 + A1 * cos(2*pi * (t - phi1));
 par.model = 'old2';
 solold = ode45(@(t,x) muscle_ode_fcn(t,x,par), [0 t0(end)+1], X0, odeopt);
 
@@ -122,7 +122,7 @@ plot(t2,vcn, t2,vco);
 
 load fit_muscle.mat
 if (~exist('dx0','var') || any(all(flatten(~isnan(dx0),2:4))) || ...
-        inputyn('Do overview simulation again?'))
+        inputyn('Do overview simulation again?','default',false))
     N = length(mtest)*length(btest);
     
     [mvals,bvals] = ndgrid(mtest,btest);
@@ -149,7 +149,7 @@ if (~exist('dx0','var') || any(all(flatten(~isnan(dx0),2:4))) || ...
         i = ii(k);
         j = jj(k);
 
-        [dx1,Pc11,data1] = fit_muscle_fcn([mtest(i); btest(j); par.lc0], @muscle_ode_fcn, par);
+        [dx1,Pc11,data1] = fit_muscle_fcn(log([mtest(i); btest(j); par.lc0]), @muscle_ode_fcn, par);
         dx0(:,k,1) = dx1;
         Pcmod0(:,k,1) = Pc11;
         data0(1,k,1) = data1;
@@ -169,7 +169,7 @@ if (~exist('dx0','var') || any(all(flatten(~isnan(dx0),2:4))) || ...
         i = ii(k);
         j = jj(k);
 
-        [dx1,Pc11,data1] = fit_muscle_fcn([mtest(i); btest(j); par.lc0], @muscle_ode_fcn, par);
+        [dx1,Pc11,data1] = fit_muscle_fcn(log([mtest(i); btest(j); par.lc0]), @muscle_ode_fcn, par);
         dx0(:,k,2) = dx1;
         Pcmod0(:,k,2) = Pc11;
         data0(1,k,2) = data1;
@@ -190,7 +190,7 @@ data = reshape(data0,length(mtest),length(btest),2);
 
 if (~exist('dxold','var'))
     par.model = 'old';
-    [dxold,Pcold,dataold] = fit_muscle_fcn([0;0], @muscle_ode_fcn, par);
+    [dxold,Pcold,dataold] = fit_muscle_fcn([0;0;log(par.lc0)], @muscle_ode_fcn, par);
 end
 save fit_muscle.mat dx0 Pcmod0 data0 dx Pcmod data dxold Pcold dataold;
 
@@ -243,7 +243,8 @@ end
 fprintf('Start at m = %f, b = %f\n', mtest(i2),btest(j2));
 optopt = optimset('Display','iter-detailed','FunValCheck','on', ...
     'UseParallel','always');
-param = lsqnonlin(@(p) fit_muscle_fcn(p,@muscle_ode_fcn,par), [mtest(i2); btest(j2); par.lc0], [0; 0; 0.8], [1; 2; 1], optopt);
+par.phi = par.phi(3);
+param = lsqnonlin(@(p) fit_muscle_fcn(p,@muscle_ode_fcn,par), log([mtest(i2) btest(j2) par.lc0]), [], [], optopt);
 
 disp(param);
 

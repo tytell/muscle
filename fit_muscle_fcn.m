@@ -1,8 +1,8 @@
 function [dx,Pcmb,data] = fit_muscle_fcn(fitpar, odefcn, par)
 
-par.mm = fitpar(1);
-par.b = fitpar(2);
-par.lc0 = fitpar(3);
+par.mm = exp(fitpar(1));
+par.b = exp(fitpar(2));
+par.lc0 = exp(fitpar(3));
 
 t1 = par.t;
 phitest1 = par.phi;
@@ -52,9 +52,6 @@ for i = 1:length(phitest1)
     data.vc(:,i) = vc1;
     data.Pc(:,i) = Pc1;
     data.Pcdat(:,i) = Pcdat(:,i);
-
-    dx(:,i) = max(Pcmb(:,i)) - max(Pcdat(:,i));
 end
-dx(isnan(dx)) = 0;
-dx = dx(:);
+dx = max(Pcmb) - max(Pcdat);
 Pcmb = Pcmb(:);
