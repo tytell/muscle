@@ -247,14 +247,18 @@ end
 %one good optimum:
 %m = 0.061635; b = 0.211072; lc0 = 0.969523    ->> sum(dx^2) = 0.001688
 
+i2 = 2;
+j2 = 4;
 fprintf('Start at m = %f, b = %f\n', mtest(i2),btest(j2));
 optopt = optimset('Display','iter-detailed','FunValCheck','on', ...
     'UseParallel','always', 'DiffMinChange',0.1);
 %par.phi = par.phi(3);
 par.model = 'ls';
-param0 = [mtest(i2); btest(j2); par.lc0; par.k1; par.k2; par.k30; par.k40; par.km1; par.km2];
+param0 = [mtest(i2); btest(j2); par.lc0; par.k1; par.k2;...
+          par.k30; par.k40; par.km1; par.km2];
 
-[param,resnorm,residual,exitflag,output] = lsqnonlin(@(p) fit_muscle_fcn(p,@muscle_ode_fcn,par), param0, [], [], optopt);
+[param,resnorm,residual,exitflag,output] = ...
+    lsqnonlin(@(p) fit_muscle_fcn(p,@muscle_ode_fcn,par), param0, [], [], optopt);
 
 disp(param);
 save('fit_muscle_opt.mat','param','resnorm','residual','exitflag','output');
