@@ -1,29 +1,43 @@
 function test_muscle
 
-mu = 600;
-lc0 = 2.6;
-ls0 = 0.234;
-lambda2 = -2.23;
-C = 2;
-S = 6;
-P0 = 60.86;
-k1 = 9.6;
-k2 = 5.9;
-k3 = 65;
-k4 = 45;
-M = 0.01;
-B = 10;
-xm = 0.4;
-xp = 1.33;
-xmax = 1.8;
-s = 0.1;
-L0 = 2.7;
-A = 0.125;
-phi = 0.1;
-T = 1;
+%optimized parameters:
+%2: m = 0.0542; b = 0.2802; lc0 = 0.9678; k1 = 6.7281; k2 = 23.2794; k30 = 51.3537; k40 = 19.3801; km1 = 17.5804; km2 = 6.0156    ->> sum(dx^2) = 6.056118
 
-act = @(t) mod(t,1) < 0.36;
-L = @(t) L0 + A * cos(2*pi/T * (t - phi));
+par.L0 = 2.94;                  % mm
+par.Lis = 2.7;                  % mm
+
+par.lc0 = 1;                    % nondimensional
+par.lambda2 = -20;              % nondim
+par.L1 = par.lc0 - 0.05;        % nondim
+
+par.C = 2;
+par.S = 6;
+
+par.P0 = 67;                    % mN/mm^2
+
+par.k1 = 6.7281;                % 1/s
+par.k2 = 23.2794;               % 1/s
+par.k30 = 51.3537;              % 1/s
+par.k40 = 19.3801;              % 1/s
+par.km1 = 17.5804;              % 1/s
+par.km2 = 6.0156;               % 1/s
+
+par.mm = 0.0542;                % arbitrary
+par.b = 0.2802;                 % arbitrary
+
+par.alpham = 0.8;               
+par.alphap = 2.9;
+par.alphamax = 1.8;
+
+par.s = 0.05;
+
+par.A = 0.125;
+par.phi = 0.1;
+par.T = 1;
+par.actdur = 0.36;
+
+par.act = @(t) mod(t,1) < par.actdur;
+par.L = @(t) par.L1 + par.A * cos(2*pi/T * (t - par.phi));
 
 dt = 0.005;
 phitest = 0:0.05:0.95;
@@ -36,8 +50,8 @@ if (~getvar('data') || ~inputyn('Use existing data?', 'default',true))
     for i = 1:length(phitest)
         phi = phitest(i);
         
-        L = @(t) L0 + A * cos(2*pi/T * (t - phi));
-        X0 = [L(0) - ls0   0   0   0];
+        L = @(t) par.L1 + par.A * cos(2*pi/par.T * (t - phi));
+        X0 = [0   0   0   0   1];
         
         [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x), 0.005, T, X0, ...
             'Display','iter-detailed', 'fixedperiod',true, 'initialcycles',2, 'TolX',1e-8, 'RelTol',1e-6);
@@ -577,125 +591,130 @@ ylabel('t_{1/2} (sec)');
 title('Mode one time constant vs k3 and k4');
 
 
-    function [hx,dhx] = h(x)
-        
-        exs = exp(x/s);
-        hx = s * log(1 + exs);
-        if (nargout == 2)
-            dhx = exs ./ (1 + exs);
-        end
-        
-    end
+%--------------------------------------------------------
+function [hx,dhx] = h(x)
 
-    function [hl,dl] = lambda(lc)
-        
-        l0 = 1 + lambda2 * (lc - lc0).^2;
-        if (nargout == 1)
-            hl = h(l0);
-        else
-            [hl,dhl] = h(l0);
-            dl = 2.*lambda2.*(lc - lc0) .* dhl;
-        end
-        
-    end
-
-    function [x,dx] = xi(vc)
-        
-        if (nargout == 1)
-            x0 = 1 + xp * h(vc) - xm * h(-vc);
-            x = h(x0);
-        else
-            [hvcp,dhvcp] = h(vc);
-            [hvcm,dhvcm] = h(-vc);
-            x0 = 1 + xp * hvcp - xm * hvcm;
-            [x,dhx] = h(x0);
-            
-            dx = (xm .* dhvcm + xp .* dhvcp) .* ...
-                dhx;
-        end
-        
-    end
-
-    function p = Pc(lc, vc, Caf)
-        
-        p = P0 .* lambda(lc) .* xi(vc) .* Caf;
-        
-    end
-
-    function dx = odefcn(t,x)
-        
-        lc = x(1,:);
-        vc = x(2,:);
-        Ca = x(3,:);
-        Caf = x(4,:);
-        
-        actval = act(t);
-        Lval = L(t);
-        
-        gact = 1./(1+exp(2-(actval-0.5)/s));
-        
-        dCaf = (k3 * Ca - k4 * Caf) .* (1 - Caf);
-        dCa = (k4 * Caf - k3 * Ca) .* (1 - Caf) + ...
-            gact .* k1 .* (C - Ca - Caf) + ...
-            (1 - gact) .* k2 .* Ca .* (C - S - Ca - Caf);
-        dlc = vc;
-        
-        dvc = 1/M * (-Pc(lc,vc,Caf) + mu * (Lval - lc - ls0) - B * vc);
-        
-        dx = [dlc; dvc; dCa; dCaf];
-        
-    end
-
-    function J = jfcn(t,x)
-        
-        % From Mathematica:
-        % J = [0,1,0,0;M.^(-1).*((-1).*\[Mu]+(-1).*Caf.*P0.*xi(vc).*d(lambda)( ...
-        %  lc)),M.^(-1).*((-1).*B+(-1).*Caf.*P0.*lambda(lc).*d(xi)(vc)) ...
-        % ,0,(-1).*M.^(-1).*P0.*lambda(lc).*xi(vc);0,0,(-1).*(1+(-1).* ...
-        % Caf).*k3+(-1).*Ca.*k2.*(1+(-1).*g(act(t)))+k2.*((-1).*Ca+( ...
-        % -1).*Caf+Cb+(-1).*Sb).*(1+(-1).*g(act(t)))+(-1).*k1.*g(act( ...
-        % t)),Ca.*k3+(1+(-1).*Caf).*k4+(-1).*Caf.*k4+(-1).*Ca.*k2.*(1+ ...
-        % (-1).*g(act(t)))+(-1).*k1.*g(act(t));0,0,(1+(-1).*Caf).*k3,( ...
-        % -1).*Ca.*k3+(-1).*(1+(-1).*Caf).*k4+Caf.*k4];
-        %
-        % d(xi) = (xim.*d(h)((-1).*vc)+xip.*d(h)(vc)).*d(h)(1+(-1).*xim.*h(( ...
-        %    -1).*vc)+xip.*h(vc));
-        %
-        % d(lambda) = 2.*lambda2.*(lc+(-1).*lc0).*d(h)(1+lambda2.*(lc+(-1).*lc0) ...
-        %  .^2);
-        %
-        % d(h) = exp(1).^(s.^(-1).*x).*(1+exp(1).^(s.^(-1).*x)).^(-1)
-        %
-        % d(g) = exp(1).^(2+(-1).*((-0.5E0)+act).*s.^(-1)).*(1+exp(1).^(2+( ...
-        % -1).*((-0.5E0)+act).*s.^(-1))).^(-2).*s.^(-1);
-        
-        lc = x(1,:);
-        vc = x(2,:);
-        Ca = x(3,:);
-        Caf = x(4,:);
-        
-        [l,dl] = lambda(lc);
-        [x,dx] = xi(vc);
-        actval = act(t);
-        gact = 1./(1+exp(2-(actval-0.5)/s));
-        
-        J = [0,1,0,0; ...
-            ...
-            1/M .* (-mu - Caf .* P0 .* x .* dl), ...
-            1/M .* (-B - Caf .* P0 .* l .* dx), ...
-            0, ...
-            -1/M .* P0 .* l .* x; ...
-            ...
-            0, 0, ...
-            -(1 - Caf) .* k3 - Ca .* k2 .* (1 - gact) + ...
-            k2 .*(-Ca - Caf + C - S) .* (1 - gact) - k1 .* gact, ...
-            Ca .* k3 + (1 - Caf).*k4 - Caf.*k4 - Ca.*k2 .* (1 - gact) - ...
-            k1 .* gact;...
-            ...
-            0, 0, (1 - Caf).*k3, -Ca.*k3 - (1 - Caf).*k4 + Caf.*k4];
-        
-    end
-
+exs = exp(x/s);
+hx = s * log(1 + exs);
+if (nargout == 2)
+    dhx = exs ./ (1 + exs);
 end
 
-  
+function [hl,dl] = lambda(lc)
+
+l0 = 1 + lambda2 * (lc - lc0).^2;
+if (nargout == 1)
+    hl = h(l0);
+else
+    [hl,dhl] = h(l0);
+    dl = 2.*lambda2.*(lc - lc0) .* dhl;
+end
+
+function [x,dx] = xi(vc)
+
+if (nargout == 1)
+    x0 = 1 + xp * h(vc) - xm * h(-vc);
+    x = h(x0);
+else
+    [hvcp,dhvcp] = h(vc);
+    [hvcm,dhvcm] = h(-vc);
+    x0 = 1 + xp * hvcp - xm * hvcm;
+    [x,dhx] = h(x0);
+
+    dx = (xm .* dhvcm + xp .* dhvcp) .* ...
+        dhx;
+end
+
+function p = Pc(lc, vc, Caf)
+
+p = P0 .* lambda(lc) .* xi(vc) .* Caf;
+
+
+function dx = odefcn(t,x, par)
+
+ls = x(1,:);
+vs = x(2,:);
+Ca = x(3,:);
+Caf = x(4,:);
+m = x(5,:);
+
+actval = par.act(t);
+Lval = par.L(t);
+Vval = par.V(t);
+
+lc = Lval - ls;
+vc = Vval - vs;
+
+gact = g(actval, par);
+
+Pcval = Pc(lc,vc,Caf, par);
+
+dm = par.km1*Pcval.*h(-vc, par) - par.km2*(m-1).*g(vc+0.5, par);
+
+k3 = par.k30 ./ sqrt(m);
+k4 = par.k40 .* sqrt(m);
+
+dCaf = (k3 .* Ca - k4 .* Caf) .* (1 - Caf);
+dCa = (k4 .* Caf - k3 .* Ca) .* (1 - Caf) + ...
+    gact .* par.k1 .* (par.C - Ca - Caf) + ...
+    (1 - gact) .* par.k2 .* Ca .* (par.C - par.S - Ca - Caf);
+dls = vs;
+
+muval = mu(Caf, par);
+
+dvs = 1/par.mm * (Pcval - par.b*vs - muval.*ls);
+
+dx = [dls; dvs; dCa; dCaf; dm];
+
+
+    
+function J = jfcn(t,x)
+
+% From Mathematica:
+% J = [0,1,0,0;M.^(-1).*((-1).*\[Mu]+(-1).*Caf.*P0.*xi(vc).*d(lambda)( ...
+%  lc)),M.^(-1).*((-1).*B+(-1).*Caf.*P0.*lambda(lc).*d(xi)(vc)) ...
+% ,0,(-1).*M.^(-1).*P0.*lambda(lc).*xi(vc);0,0,(-1).*(1+(-1).* ...
+% Caf).*k3+(-1).*Ca.*k2.*(1+(-1).*g(act(t)))+k2.*((-1).*Ca+( ...
+% -1).*Caf+Cb+(-1).*Sb).*(1+(-1).*g(act(t)))+(-1).*k1.*g(act( ...
+% t)),Ca.*k3+(1+(-1).*Caf).*k4+(-1).*Caf.*k4+(-1).*Ca.*k2.*(1+ ...
+% (-1).*g(act(t)))+(-1).*k1.*g(act(t));0,0,(1+(-1).*Caf).*k3,( ...
+% -1).*Ca.*k3+(-1).*(1+(-1).*Caf).*k4+Caf.*k4];
+%
+% d(xi) = (xim.*d(h)((-1).*vc)+xip.*d(h)(vc)).*d(h)(1+(-1).*xim.*h(( ...
+%    -1).*vc)+xip.*h(vc));
+%
+% d(lambda) = 2.*lambda2.*(lc+(-1).*lc0).*d(h)(1+lambda2.*(lc+(-1).*lc0) ...
+%  .^2);
+%
+% d(h) = exp(1).^(s.^(-1).*x).*(1+exp(1).^(s.^(-1).*x)).^(-1)
+%
+% d(g) = exp(1).^(2+(-1).*((-0.5E0)+act).*s.^(-1)).*(1+exp(1).^(2+( ...
+% -1).*((-0.5E0)+act).*s.^(-1))).^(-2).*s.^(-1);
+
+lc = x(1,:);
+vc = x(2,:);
+Ca = x(3,:);
+Caf = x(4,:);
+
+[l,dl] = lambda(lc);
+[x,dx] = xi(vc);
+actval = act(t);
+gact = 1./(1+exp(2-(actval-0.5)/s));
+
+J = [0,1,0,0; ...
+    ...
+    1/M .* (-mu - Caf .* P0 .* x .* dl), ...
+    1/M .* (-B - Caf .* P0 .* l .* dx), ...
+    0, ...
+    -1/M .* P0 .* l .* x; ...
+    ...
+    0, 0, ...
+    -(1 - Caf) .* k3 - Ca .* k2 .* (1 - gact) + ...
+    k2 .*(-Ca - Caf + C - S) .* (1 - gact) - k1 .* gact, ...
+    Ca .* k3 + (1 - Caf).*k4 - Caf.*k4 - Ca.*k2 .* (1 - gact) - ...
+    k1 .* gact;...
+    ...
+    0, 0, (1 - Caf).*k3, -Ca.*k3 - (1 - Caf).*k4 + Caf.*k4];
+
+
+
