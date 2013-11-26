@@ -1,13 +1,18 @@
 function [dx,Pcmb,data] = fit_muscle_fcn(fitpar, odefcn, par)
 
-par.mm = exp(fitpar(1));
-par.b = exp(fitpar(2));
-par.lc0 = exp(fitpar(3));
+par.mm = fitpar(1);
+par.b = fitpar(2);
+par.lc0 = fitpar(3);
+par.k1 = fitpar(4);  
+par.k2 = fitpar(5); 
+par.k30 = fitpar(6);
+par.k40 = fitpar(7); 
+par.km1 = fitpar(8);
+par.km2 = fitpar(9);
 
 t1 = par.t;
 phitest1 = par.phi;
 
-dx = zeros(length(t1),length(phitest1));
 Pcmb = zeros(length(t1),length(phitest1));
 Pcdat = zeros(length(t1),length(phitest1));
 
@@ -53,5 +58,12 @@ for i = 1:length(phitest1)
     data.Pc(:,i) = Pc1;
     data.Pcdat(:,i) = Pcdat(:,i);
 end
-dx = max(Pcmb) - max(Pcdat);
+%dx = max(Pcmb) - max(Pcdat);
+dx = flatten(Pcmb - Pcdat);
+dx(isnan(dx)) = 0;
 Pcmb = Pcmb(:);
+
+fprintf('m = %g; b = %g; lc0 = %g; k1 = %g; k2 = %g; k30 = %g; k40 = %g; km1 = %g; km2 = %g    ->> sum(dx^2) = %f\n', ...
+par.mm, par.b, par.lc0, par.k1, par.k2, ...
+par.k30, par.k40, par.km1, par.km2, sum(dx.^2));
+

@@ -149,7 +149,9 @@ if (~exist('dx0','var') || any(all(flatten(~isnan(dx0),2:4))) || ...
         i = ii(k);
         j = jj(k);
 
-        [dx1,Pc11,data1] = fit_muscle_fcn(log([mtest(i); btest(j); par.lc0]), @muscle_ode_fcn, par);
+        param = [mtest(i); btest(j); par.lc0; par.k1; par.k2; par.k30; par.k40; par.km1; par.km2];
+
+        [dx1,Pc11,data1] = fit_muscle_fcn(param, @muscle_ode_fcn, par);
         dx0(:,k,1) = dx1;
         Pcmod0(:,k,1) = Pc11;
         data0(1,k,1) = data1;
@@ -169,7 +171,8 @@ if (~exist('dx0','var') || any(all(flatten(~isnan(dx0),2:4))) || ...
         i = ii(k);
         j = jj(k);
 
-        [dx1,Pc11,data1] = fit_muscle_fcn(log([mtest(i); btest(j); par.lc0]), @muscle_ode_fcn, par);
+        param = [mtest(i); btest(j); par.lc0; par.k1; par.k2; par.k30; par.k40; par.km1; par.km2];
+        [dx1,Pc11,data1] = fit_muscle_fcn(param, @muscle_ode_fcn, par);
         dx0(:,k,2) = dx1;
         Pcmod0(:,k,2) = Pc11;
         data0(1,k,2) = data1;
@@ -190,7 +193,8 @@ data = reshape(data0,length(mtest),length(btest),2);
 
 if (~exist('dxold','var'))
     par.model = 'old';
-    [dxold,Pcold,dataold] = fit_muscle_fcn([0;0;log(par.lc0)], @muscle_ode_fcn, par);
+    param = [0;0; par.lc0; par.k1; par.k2; par.k30; par.k40; par.km1; par.km2];
+    [dxold,Pcold,dataold] = fit_muscle_fcn(param, @muscle_ode_fcn, par);
 end
 save fit_muscle.mat dx0 Pcmod0 data0 dx Pcmod data dxold Pcold dataold;
 
@@ -240,13 +244,33 @@ for k = 1:10
         musc.tmod+k-1, musc.Fmod(:,k)/par.P0, 'm-');
 end
 
+%one good optimum:
+%m = 0.061635; b = 0.211072; lc0 = 0.969523    ->> sum(dx^2) = 0.001688
+
 fprintf('Start at m = %f, b = %f\n', mtest(i2),btest(j2));
 optopt = optimset('Display','iter-detailed','FunValCheck','on', ...
-    'UseParallel','always');
-par.phi = par.phi(3);
-param = lsqnonlin(@(p) fit_muscle_fcn(p,@muscle_ode_fcn,par), log([mtest(i2) btest(j2) par.lc0]), [], [], optopt);
+    'UseParallel','always', 'DiffMinChange',0.1);
+%par.phi = par.phi(3);
+par.model = 'ls';
+param0 = [mtest(i2); btest(j2); par.lc0; par.k1; par.k2; par.k30; par.k40; par.km1; par.km2];
+
+[param,resnorm,residual,exitflag,output] = lsqnonlin(@(p) fit_muscle_fcn(p,@muscle_ode_fcn,par), param0, [], [], optopt);
 
 disp(param);
+save('fit_muscle_opt.mat','param','resnorm','residual','exitflag','output');
+
+par.phi = musc.phi;
+[dxfit,Pcfit,datafit] = fit_muscle_fcn(param, @muscle_ode_fcn, par);
+
+figureseries('Fit comparison');
+clf;
+for k = 1:10
+    addplot(t0+k-1,datafit.Pcdat(:,k), 'k-', ...
+        t0+k-1,datafit.Pc(:,k), 'b--',...
+        'LineWidth',2);
+    addplot(t0+k-1,dataold.Pc(:,k), 'r-', ...
+        musc.tmod+k-1, musc.Fmod(:,k)/par.P0, 'm-');
+end
 
 return;
 
