@@ -3,6 +3,8 @@ function test_muscle
 %optimized parameters:
 %2: m = 0.0542; b = 0.2802; lc0 = 0.9678; k1 = 6.7281; k2 = 23.2794; k30 = 51.3537; k40 = 19.3801; km1 = 17.5804; km2 = 6.0156    ->> sum(dx^2) = 6.056118
 
+filename = 'test_muscle.mat';
+
 par.L0 = 2.94;                  % mm
 par.Lis = 2.7;                  % mm
 
@@ -48,7 +50,7 @@ showphi = [1 6 11 17];
 
 pertmag = 0.1;
     
-if (~getvar('data') || ~inputyn('Use existing data?', 'default',true))
+if (~getvar('-file',filename,'data') || ~inputyn('Use existing data?', 'default',true))
     n = par.T / dt + 1;
     z = zeros(n,1);
     z5 = zeros(n,5);
@@ -78,7 +80,7 @@ if (~getvar('data') || ~inputyn('Use existing data?', 'default',true))
         data1 = get_floquet(data1,@(t,x) jfcn(t,x,par), 100);
         data(i) = data1;
     end
-    putvar data;
+    putvar('-file',filename,'data');
 end
 
 Pcall = cat(2,data.Pc);
@@ -124,6 +126,8 @@ end;
 set(hax(:,1),'YLim',[0 maxforce]);
 set(hax, 'TickDir','out');
 set(hax(:,2), 'YAxisLocation','right');
+set(gcf,'Color','w');
+print('-dpdf','PhaseEffect.pdf');
 
 fxx = cat(4, data.fx);
 sgn1 = sign(fxx(1,1,1,:));
@@ -136,6 +140,7 @@ plot(phitest, log(0.5) ./ real(fexp)');
 xlabel('Phase');
 ylabel('t_{1/2} (sec)');
 title('Mode time constants');
+print('-dpdf','ModeTimeConstants.pdf');
 
 t = data(1).t;
 
@@ -152,6 +157,7 @@ for i = 1:4,
     title(sprintf('\\phi_{act} = %g',phitest(j)));
 end
 legend('lc','vc','Ca','Caf','m','Location','best');
+print('-dpdf','FloquetModesVsPhi.pdf');
 
 figureseries('Floquet exp');
 clf;
@@ -175,6 +181,7 @@ xlabel('Time (s)');
 subplot(2,4,6:7);
 plot(data(i).t, bsxfun(@times, fxx(:,:,1,i), dec1), 'LineWidth',2);
 xlabel('Time (s)');
+print('-dpdf','FloquetExp.pdf');
 
 
 
@@ -189,13 +196,14 @@ for i = 1:4,
     title(sprintf('\\phi_{act} = %g',phitest(j)));
 end
 legend([h1(1); h2], 'steady','lc','vc','Ca','Caf','m','Location','best');
+print('-dpdf','DevVsPhi.pdf');
 
-if (~getvar('pertdata') || ~inputyn('Use existing data?', 'default',true))
+if (~getvar('-file',filename,'pertdata') || ~inputyn('Use existing data?', 'default',true))
     i = 3;
     t0 = data(i).t;
     xbase = data(i).x;
     Pcbase = data(i).Pc;
-    lcbase = data(i).lc;
+    lcbase = data(i).lc;s
     vcbase = data(i).vc;
     
     phi1 = phitest(i);
@@ -242,7 +250,7 @@ if (~getvar('pertdata') || ~inputyn('Use existing data?', 'default',true))
         pertdata(i,j).Pc = Pc1;
     end
     
-    putvar pertdata;
+    putvar('-file',filename,'pertdata');
 end
 
 figureseries('Random perturbations');
@@ -285,8 +293,9 @@ ylabel(hax(4),'P_c (mN)');
 xlabel(hax(4),'Time (sec)');
 
 set(hax,'Box','off', 'TickDir','out');
+print('-dpdf','Pert.pdf');
 
-if (~getvar('devdata','Pcdevall','W0','Wdev') || ~inputyn('Use existing data?', 'default',true))
+if (~getvar('-file',filename,'devdata','Pcdevall','W0','Wdev') || ~inputyn('Use existing data?', 'default',true))
     devdata = struct([]);
     
     figureseries('Test');
@@ -368,7 +377,7 @@ if (~getvar('devdata','Pcdevall','W0','Wdev') || ~inputyn('Use existing data?', 
             
             timedWaitBar(n/N, 'Computing deviations...');
         end
-        putvar devdata Pcdevall W0 Wdev;
+        putvar('-file',filename,'devdata','Pcdevall','W0','Wdev');
         %pause;
     end
 end
@@ -389,6 +398,7 @@ for ii = 1:4
         k = k+1;
     end
 end
+print('-dpdf','CheckFloquet.pdf');
 
 figureseries('Effect of perturbations');
 clf;
@@ -397,6 +407,7 @@ plot(data(showphi).t, data(showphi).Pc, 'k--','LineWidth',2);
 for i = 1:4:length(phitest),
     addplot(data(showphi).t, Pcdevall(:,showphi,i), 'r-');
 end
+print('-dpdf','EffectPert.pdf');
 
 figureseries('Change in work');
 clf;
@@ -411,6 +422,7 @@ for i = 1:length(showphi)
 end
 
 labellines(lab, 'location',[0.6 0.6 0.65 0.45],'rotation',0);
+print('-dpdf','ChangeInWork.pdf');
 
 figureseries('Change in work contour');
 clf;
@@ -421,11 +433,12 @@ xlabel('Phase of activation');
 ylabel('Phase of perturbation');
 
 ylabel(hcol, 'Fractional change');
+print('-dpdf','ChangeInWorkCont.pdf');
 
 
 L1test = par.lc0 + [-2*par.A 0 2*par.A];
 phitest2 = 0:0.2:0.8;
-if (~getvar('L1data') || ~inputyn('Use existing data?', 'default',true))
+if (~getvar('-file',filename,'L1data') || ~inputyn('Use existing data?', 'default',true))
     L1orig = par.L1;
     L1data = struct([]);
     for i = 1:length(phitest2)
@@ -451,7 +464,7 @@ if (~getvar('L1data') || ~inputyn('Use existing data?', 'default',true))
         end
     end
     L1data = reshape(L1data,[length(L1test) length(phitest2)]);
-    putvar L1data;
+    putvar('-file',filename,'L1data');
     
     %reset L1
     par.L1 = L1orig;
@@ -486,13 +499,14 @@ fx = reshape(fx,[5 size(L1data)]);
 plot(phitest2,squeeze(fx(1,:,:)),'o-');
 xlabel('Activation phase');
 ylabel('Mode 1 exponent');
+print('-dpdf','LengthEffect.pdf');
 
 vals = fullfact([2 2 2 2]);
 islen = vals(:,1) == 2;
 isvel = vals(:,2) == 2;
 iswork = vals(:,3) == 2;
 isstiff = vals(:,4) == 2;
-if (~getvar('NLdata') || ~inputyn('Use existing data?', 'default',true))
+if (~getvar('-file',filename,'NLdata') || ~inputyn('Use existing data?', 'default',true))
     par0 = par;
     
     NLdata = struct([]);
@@ -517,6 +531,7 @@ if (~getvar('NLdata') || ~inputyn('Use existing data?', 'default',true))
         if (isstiff(i))
             par.mu1 = par0.mu1;
         else
+            par.mu0 = par0.mu0 + par0.mu1;
             par.mu1 = 0;
         end
         
@@ -542,12 +557,12 @@ if (~getvar('NLdata') || ~inputyn('Use existing data?', 'default',true))
             data1.isstiff = isstiff(i);
             
             NLdata = makestructarray(NLdata,data1);
-            putvar NLdata;
+            putvar('-file',filename,'NLdata');
         end
     end
     NLdata = reshape(NLdata,[length(phitest2) length(islen)]);
 
-    putvar NLdata;
+    putvar('-file',filename,'NLdata');
     par = par0;
 end
 
@@ -592,6 +607,7 @@ for i = 1:4,
     end
 end
 set(hax,'YLim',yl);
+print('-dpdf','FloquetExpVsNonLin.pdf');
 
 
 Pcnl = cat(2,NLdata.Pc);
@@ -634,9 +650,10 @@ for i = 1:4,
     end
 end
 set(hax,'YLim',yl);
+print('-dpdf','NonLin.pdf');
 
 Btest = [5 10 15 20];
-if (~getvar('Bdata') || ~inputyn('Use existing B data?', 'default',true))
+if (~getvar('-file',filename,'Bdata') || ~inputyn('Use existing B data?', 'default',true))
     Bdata = struct([]);
     for i = 1:length(phitest2)
         phi = phitest2(i);
@@ -657,7 +674,7 @@ if (~getvar('Bdata') || ~inputyn('Use existing B data?', 'default',true))
         end
     end
     Bdata = reshape(Bdata,[length(Btest) length(phitest2)]);
-    putvar Bdata;
+    putvar('-file',filename,'Bdata');
     
     B = 10;
 end
@@ -670,10 +687,11 @@ plot(Btest,log(0.5) ./ real(squeeze(fx(1,:,:))),'o-');
 xlabel('Damping coefficient');
 ylabel('t_{1/2} (sec)');
 title('Mode one time constant vs damping');
+print('-dpdf','Damping.pdf');
 
 k3test = 0.6:0.1:1.4;
 k4test = [0.8 1 1.2];
-if (~getvar('k34data') || ~inputyn('Use existing k3 k4 data?', 'default',true))
+if (~getvar('-file',filename,'k34data') || ~inputyn('Use existing k3 k4 data?', 'default',true))
     phi = 0;
     k30 = k3;
     k40 = k4;
@@ -699,7 +717,7 @@ if (~getvar('k34data') || ~inputyn('Use existing k3 k4 data?', 'default',true))
         end
     end
     k34data = reshape(k34data,[length(k4test) length(k3test)]);
-    putvar k34data;
+    putvar('-file',filename,'k34data');
     
     k3 = k30;
     k4 = k40;
@@ -722,6 +740,7 @@ labellines(lab ,'rotation',0);
 xlabel('k3');
 ylabel('t_{1/2} (sec)');
 title('Mode one time constant vs k3 and k4');
+print('-dpdf','Calcium.pdf');
 
 
 %--------------------------------------------------------
