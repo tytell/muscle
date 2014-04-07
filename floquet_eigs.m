@@ -2,6 +2,7 @@ function [uf,mu] = floquet_eigs(F,P, per, varargin)
 
 opt.minfrac = 0.05;
 opt.mult = 1.5;
+opt.maxiter = 100;
 opt = parsevarargin(opt, varargin, 4);
 
 minexp = log(0.5) / (opt.minfrac * per);
@@ -9,9 +10,10 @@ minexp = log(0.5) / (opt.minfrac * per);
 guess = 0;
 lasteig = 1;
 n = 0;
+iter = 0;
 mu = NaN(P,1);
 uf = NaN(size(F,1),P);
-while (n < P)
+while ((n < P) && (iter < opt.maxiter))
     try
         [uf1, mu1] = eigs(F,1, guess);
     catch err
@@ -22,7 +24,7 @@ while (n < P)
         end
     end
     
-    if ((abs(imag(mu1)) <= pi/per) && (abs(mu1 - lasteig)/abs(lasteig) > 0.001))
+    if ((abs(imag(mu1)) <= 1.2*pi/per) && (abs(mu1 - lasteig)/abs(lasteig) > 0.001))
         if (~isreal(mu1))
             mu(n+(1:2)) = [mu1 conj(mu1)];
             uf(:,n+(1:2)) = [uf1 conj(uf1)];
@@ -43,7 +45,13 @@ while (n < P)
     else
         guess = opt.mult * guess;
     end
+    iter = iter + 1;
 end
+
+if ((n < P) && (iter == opt.maxiter))
+    warning('Maximum iterations reached with only %d eigenvalues.', n);
+end
+
 
         
         

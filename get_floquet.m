@@ -45,7 +45,8 @@ F = Ahat - 2*pi/data.per * Omega;
 %[uf,mu] = eigs(F, P, 'si');
 [uf,mu] = floquet_eigs(F, P, data.per);
 
-uf = reshape(uf,[N2 P P]);
+uf = reshape(uf(:,1:P),[N2 P P]);
+mu = mu(1:P);
 
 x = NaN(length(data.t),P,P);
 for i = 1:P

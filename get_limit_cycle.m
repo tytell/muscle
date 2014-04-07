@@ -80,9 +80,9 @@ switch opt.method
         data.t = t1;
         data.x = x';
         data.xp = xp';
+        data.sol = sol;
         data.per = per;
         data.fcn = fcn;
-        data.sol = sol;
  end
 
 

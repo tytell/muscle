@@ -29,9 +29,12 @@ par.alpham = 0.8;
 par.alphap = 2.9;
 par.alphamax = 1.8;
 
+par.mu0 = 1;
+par.mu1 = 23;
+
 par.s = 0.05;
 
-par.A = 0.125;
+par.A = 0.125/par.L0;
 par.phi = 0.1;
 par.T = 1;
 par.actdur = 0.36;
@@ -46,20 +49,34 @@ showphi = [1 6 11 17];
 pertmag = 0.1;
     
 if (~getvar('data') || ~inputyn('Use existing data?', 'default',true))
-    data = struct([]);
+    n = par.T / dt + 1;
+    z = zeros(n,1);
+    z5 = zeros(n,5);
+    
+    data = struct('t',z, 'x',z, 'xp',z, 'sol',struct([]), ...
+        'per',par.T, 'fcn',@(t,x) odefcn(t,x,par), ...
+        'phi',0,'L',[],'V',[], 'lc',z, 'vc',z, 'Pc',z, ...
+        'jfcn',@(t,x) jfcn(t,x,par), 'fx',zeros(n,5,5), 'fexp',zeros(5,1), ...
+        'fmode',zeros(n,5,5));
+    data = repmat(data,[1 length(phitest)]);
     for i = 1:length(phitest)
-        phi = phitest(i);
+        phi1 = phitest(i);
         
-        L = @(t) par.L1 + par.A * cos(2*pi/par.T * (t - phi));
+        par.L = @(t) par.L1 + par.A * cos(2*pi/par.T * (t - phi1));
+        par.V = @(t) -2*pi/par.T * par.A * sin(2*pi/par.T * (t - phi1));
         X0 = [0   0   0   0   1];
         
-        [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x), 0.005, T, X0, ...
+        [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x,par), dt, par.T, X0, ...
             'Display','iter-detailed', 'fixedperiod',true, 'initialcycles',2, 'TolX',1e-8, 'RelTol',1e-6);
-        data1.Pc = Pc(data1.x(:,1), data1.x(:,2), data1.x(:,4));
+        data1.phi = phi1;
+        data1.L = par.L;
+        data1.V = par.V;
+        data1.lc = data1.L(data1.t) - data1.x(:,1);
+        data1.vc = data1.V(data1.t) - data1.x(:,2);
+        data1.Pc = Pc(data1.lc, data1.vc, data1.x(:,4), par);
         
-        data1 = get_floquet(data1,@(t,x) jfcn(t,x), 100);
-        data1.L = L;
-        data = makestructarray(data,data1);
+        data1 = get_floquet(data1,@(t,x) jfcn(t,x,par), 100);
+        data(i) = data1;
     end
     putvar data;
 end
@@ -85,10 +102,10 @@ for i = 1:4
     set(hax(i,1),'Position',pos1);
     set(hax(i,2),'Position',pos2);
     
-    fill([0 0.36 0.36 0],[0 0 maxforce maxforce],[0.8 0.8 0.8], 'Parent',hax(i,1), ...
+    fill([0 par.actdur par.actdur 0],[0 0 maxforce maxforce],[0.8 0.8 0.8], 'Parent',hax(i,1), ...
         'EdgeColor','none');
 
-    fill([0 0.36 0.36 0],L0 + [-A -A A A],[0.8 0.8 0.8], 'Parent',hax(i,2), ...
+    fill([0 par.actdur par.actdur 0],par.L1 + par.A*[-1 -1 1 1],[0.8 0.8 0.8], 'Parent',hax(i,2), ...
         'EdgeColor','none');
 
     j = showphi(i);
@@ -127,11 +144,14 @@ clf;
 for i = 1:4,
     subplot(2,2,i);
     j = showphi(i);
-    plot(data(j).t, fxx(:,:,1,j));
+    plot(data(j).t, real(fxx(:,:,1,j)));
+    if any(~isreal(fxx(:,:,1,j)))
+        addplot(data(j).t, imag(fxx(:,:,1,j)));
+    end
     xlabel('Time (s)');
     title(sprintf('\\phi_{act} = %g',phitest(j)));
 end
-legend('lc','vc','Ca','Caf','Location','best');
+legend('lc','vc','Ca','Caf','m','Location','best');
 
 figureseries('Floquet exp');
 clf;
@@ -139,8 +159,8 @@ i = 1;
 subplot(2,2,1);
 plot(data(i).t, fxx(:,:,1,i), 'LineWidth',2);
 xlabel('Time (s)');
-labellines({'\delta l_c','\delta v_c', '\delta Ca', '\delta Caf'}, ...
-    'location',[0.7 0.8 0.7 0.42],'rotation',0);
+labellines({'\delta l_c','\delta v_c', '\delta Ca', '\delta Caf', '\delta m'}, ...
+    'location',[0.05 0.1 0.6 0.5 0.8],'rotation',0);
 
 a = find(t >= phitest(6),1);
 k = [a:length(t) 1:a-1]';
@@ -164,25 +184,30 @@ for i = 1:4,
     subplot(2,2,i);
     j = showphi(i);
     h1 = plot(data(j).t, data(j).x, 'k--');
-    h2 = addplot(data(j).t, data(j).x + 0.1*fxx(:,:,1,j));
+    h2 = addplot(data(j).t, data(j).x + 0.1*real(fxx(:,:,1,j)));
     xlabel('Time (s)');
     title(sprintf('\\phi_{act} = %g',phitest(j)));
 end
-legend([h1(1); h2], 'steady','lc','vc','Ca','Caf','Location','best');
+legend([h1(1); h2], 'steady','lc','vc','Ca','Caf','m','Location','best');
 
 if (~getvar('pertdata') || ~inputyn('Use existing data?', 'default',true))
     i = 3;
     t0 = data(i).t;
     xbase = data(i).x;
     Pcbase = data(i).Pc;
+    lcbase = data(i).lc;
+    vcbase = data(i).vc;
     
-    L = data(i).L;
+    phi1 = phitest(i);
+
+    par.L = data(i).L;
+    par.V = data(i).V;
     
     phipert = [0.2 0.7 0.2 0.2];
-    pertval = [0.1 0 0 0; ...
-        0.1 0 0 0;
-        0 0.5 0 0;
-        0 0 0 -0.1];
+    pertval = [0.1 0 0 0 0; ...
+        0.1 0 0 0 0;
+        0 0.5 0 0 0;
+        0 0 0 -0.1 0];
 
     pertdata = struct([]);
     odeopt = odeset('RelTol',1e-6);
@@ -190,21 +215,30 @@ if (~getvar('pertdata') || ~inputyn('Use existing data?', 'default',true))
         a = find(t >= phipert(j),1);
 
         xinit = xbase(a,:) + pertval(j,:);
-        sol = ode45(@odefcn, t0(a) + [0 T], xinit', odeopt);
+        sol = ode45(@(t,x) odefcn(t,x,par), t0(a) + [0 par.T], xinit', odeopt);
 
+        t1 = t0;
+        t1(1:a-1) = t0(1:a-1)+par.T;
+        
         x1 = NaN(size(xbase));
         x1(a:end,:) = deval(sol, t0(a:end))';
         if (a > 1)
-            x1(1:a-1,:) = deval(sol, T + t0(1:a-1))';
+            x1(1:a-1,:) = deval(sol, par.T + t0(1:a-1))';
         end
-        Pc1 = Pc(x1(:,1), x1(:,2), x1(:,4));
+        lc1 = par.L(t1) - x1(:,1);
+        vc1 = par.V(t1) - x1(:,2);
+        Pc1 = Pc(lc1, vc1, x1(:,4), par);
 
         pertdata(i,j).phipert = phipert(j);
-        pertdata(i,j).x0 = xbase;
-        pertdata(i,j).Pc0 = Pcbase;
+        pertdata(i,j).xbase = xbase;
+        pertdata(i,j).Pcbase = Pcbase;
+        pertdata(i,j).lcbase = lcbase;
+        pertdata(i,j).vcbase = vcbase;
         pertdata(i,j).t = t0;
         pertdata(i,j).x = x1;
         pertdata(i,j).xinit = xinit;
+        pertdata(i,j).lc = lc1;
+        pertdata(i,j).vc = vc1;
         pertdata(i,j).Pc = Pc1;
     end
     
@@ -215,20 +249,22 @@ figureseries('Random perturbations');
 clf;
 i = 3;
 t0 = pertdata(i,1).t;
-xbase = pertdata(i,1).x0;
-Pcbase = pertdata(i,1).Pc0;
+xbase = pertdata(i,1).xbase;
+Pcbase = pertdata(i,1).Pcbase;
+lcbase = pertdata(i,1).lcbase;
+vcbase = pertdata(i,1).vcbase;
 
 hax = tight_subplot(4,1, 0.02,[0.12 0.01],[0.12 0.01]);
 
-plot(hax(1), t0,xbase(:,1), 'k-', 'LineWidth',2);
-plot(hax(2), t0,xbase(:,2), 'k-', 'LineWidth',2);
+plot(hax(1), t0,lcbase, 'k-', 'LineWidth',2);
+plot(hax(2), t0,vcbase, 'k-', 'LineWidth',2);
 plot(hax(3), t0,xbase(:,4), 'k-', 'LineWidth',2);
 plot(hax(4), t0,Pcbase, 'k-', 'LineWidth',2);
 
 col = 'rgbc';
 for j = 1:size(pertdata,2)
-    addplot(hax(1), t0,pertdata(i,j).x(:,1), [col(j) '--']);
-    addplot(hax(2), t0,pertdata(i,j).x(:,2), [col(j) '--']);
+    addplot(hax(1), t0,pertdata(i,j).lc, [col(j) '--']);
+    addplot(hax(2), t0,pertdata(i,j).vc, [col(j) '--']);
     addplot(hax(3), t0,pertdata(i,j).x(:,4), [col(j) '--']);
     addplot(hax(4), t0,pertdata(i,j).Pc, [col(j) '--']);
 end
@@ -268,10 +304,13 @@ if (~getvar('devdata','Pcdevall','W0','Wdev') || ~inputyn('Use existing data?', 
         t0 = data(i).t;
         xbase = data(i).x;
         Pcbase = data(i).Pc;
+        lcbase = data(i).lc;
+        vcbase = data(i).vc;
 
-        L = data(i).L;
+        par.L = data(i).L;
+        par.V = data(i).V;
         
-        W0(i) = trapz(-data(i).L(t), Pcbase);
+        W0(i) = trapz(-data(i).L(t0), Pcbase);
         % plot(-data(i).L(t), Pcbase, 'k-');
         % fprintf('Total work at phase %g = %g\n', phitest(i), W0(i));
 
@@ -287,32 +326,42 @@ if (~getvar('devdata','Pcdevall','W0','Wdev') || ~inputyn('Use existing data?', 
             dev1 = bsxfun(@times, dev1, dec1);
 
             xfx1 = xbase + 0.2*dev1;
-            Pcdevall(:,i,j) = Pc(xfx1(:,1),xfx1(:,2),xfx1(:,4));
+            Pcdevall(:,i,j) = Pc(par.L(t0)-xfx1(:,1),par.V(t0)-xfx1(:,2),xfx1(:,4), par);
 
             Wdev(i,j) = trapz(-data(i).L(t), Pcdevall(:,i,j));
             %addplot(-data(i).L(t), Pcdevall(:,i,j), 'r-');
             %drawnow;
             
             if (ismember(j,showphi))
-                sol = ode45(@odefcn, t0(a) + [0 T], xfx1(a,:)', odeopt);
+                sol = ode45(@(t,x) odefcn(t,x,par), t0(a) + [0 par.T], xfx1(a,:)', odeopt);
 
                 x1 = NaN(size(xbase));
+                t1 = t0;
+                t1(1:a-1) = par.T + t0(1:a-1);
                 x1(a:end,:) = deval(sol, t0(a:end))';
                 if (a > 1)
-                    x1(1:a-1,:) = deval(sol, T + t0(1:a-1))';
+                    x1(1:a-1,:) = deval(sol, par.T + t0(1:a-1))';
                 end
-                Pc1 = Pc(x1(:,1), x1(:,2), x1(:,4));
+                lc1 = par.L(t1) - x1(:,1);
+                vc1 = par.V(t1) - x1(:,2);
+                Pc1 = Pc(lc1,vc1, x1(:,4), par);
             else
                 x1 = [];
+                lc1 = [];
+                vc1 = [];
                 Pc1 = [];
             end
 
-            devdata(i,j).phipert = phi;
-            devdata(i,j).x0 = xbase;
-            devdata(i,j).Pc0 = Pcbase;
+            devdata(i,j).phipert = phitest(j);
+            devdata(i,j).xbase = xbase;
+            devdata(i,j).lcbase = lcbase;
+            devdata(i,j).vcbase = vcbase;
+            devdata(i,j).Pcbase = Pcbase;
             devdata(i,j).t = t0;
             devdata(i,j).x = x1;
             devdata(i,j).xfx = xfx1;
+            devdata(i,j).lc = lc1;
+            devdata(i,j).vc = vc1;
             devdata(i,j).Pc = Pc1;
                         
             n = n+1;
@@ -334,9 +383,9 @@ for ii = 1:4
         j = showphi(jj);
         
         subplot(4,4,k);
-        plot(devdata(i,j).t,devdata(i,j).x0,'k-');
-        addplot(devdata(i,j).t,devdata(i,j).x, '--', 'LineWidth',2);
-        addplot(devdata(i,j).t,devdata(i,j).xfx,':', 'LineWidth',2);
+        plot(devdata(i,j).t,devdata(i,j).xbase,'k-');
+        addplot(devdata(i,j).t,real(devdata(i,j).x), '--', 'LineWidth',2);
+        addplot(devdata(i,j).t,real(devdata(i,j).xfx),':', 'LineWidth',2);
         k = k+1;
     end
 end
@@ -374,46 +423,51 @@ ylabel('Phase of perturbation');
 ylabel(hcol, 'Fractional change');
 
 
-L0test = lc0 + ls0 + [-2*A 0 2*A];
+L1test = par.lc0 + [-2*par.A 0 2*par.A];
 phitest2 = 0:0.2:0.8;
-if (~getvar('L0data') || ~inputyn('Use existing data?', 'default',true))
-    L0data = struct([]);
+if (~getvar('L1data') || ~inputyn('Use existing data?', 'default',true))
+    L1orig = par.L1;
+    L1data = struct([]);
     for i = 1:length(phitest2)
         phi = phitest2(i);
-        for j = 1:length(L0test)
-            L0 = L0test(j);
+        for j = 1:length(L1test)
+            par.L1 = L1test(j);
 
-            L = @(t) L0 + A * cos(2*pi/T * (t - phi));
-            X0 = [L(0) - ls0   0   0   0];
+            par.L = @(t) par.L1 + par.A * cos(2*pi/par.T * (t - phi));
+            par.V = @(t) -2*pi/par.T * par.A * sin(2*pi/par.T * (t - phi));
+            X0 = [0   0   0   0   1];
 
-            [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x), 0.005, T, X0, ...
+            [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x,par), dt, par.T, X0, ...
                 'Display','iter-detailed', 'fixedperiod',true, 'initialcycles',2, 'TolX',1e-8, 'RelTol',1e-6);
-            data1.Pc = Pc(data1.x(:,1), data1.x(:,2), data1.x(:,4));
+            
+            data1.lc = par.L(data1.t) - data1.x(:,1);
+            data1.vc = par.V(data1.t) - data1.x(:,2);
+            data1.Pc = Pc(data1.lc, data1.vc, data1.x(:,4), par);
 
-            data1 = get_floquet(data1,@(t,x) jfcn(t,x), 100);
-            data1.L = L;
-            L0data = makestructarray(L0data,data1);
+            data1 = get_floquet(data1,@(t,x) jfcn(t,x,par), 100);
+            data1.L = par.L;
+            data1.V = par.V;
+            L1data = makestructarray(L1data,data1);
         end
     end
-    L0data = reshape(L0data,[length(L0test) length(phitest2)]);
-    putvar L0data;
+    L1data = reshape(L1data,[length(L1test) length(phitest2)]);
+    putvar L1data;
     
-    %reset L0
-    L0 = 2.7;
+    %reset L1
+    par.L1 = L1orig;
 end
 
-lcall = cat(3,L0data.x);
-lcall = squeeze(lcall(:,1,:));
-lcall = reshape(lcall, [size(lcall,1) size(L0data)]);
+lcall = cat(2,L1data.lc);
+lcall = reshape(lcall,[],3,length(phitest2));
 
 figureseries('Length effect');
 clf;
 subplot(2,2,1);
-lc1 = 0.7*lc0:0.01:1.3*lc0;
-plot(lc1, lambda(lc1), 'k--');
-addplot(squeeze(lcall(:,1,:)), squeeze(lambda(lcall(:,1,:))),'b-', ...
-    squeeze(lcall(:,2,:)), squeeze(lambda(lcall(:,2,:))),'g-', ...
-    squeeze(lcall(:,3,:)), squeeze(lambda(lcall(:,3,:))),'r-', ...
+lc1 = 0.7*par.lc0:0.01:1.3*par.lc0;
+plot(lc1, lambda(lc1, par), 'k--');
+addplot(squeeze(lcall(:,1,:)), squeeze(lambda(lcall(:,1,:),par)),'b-', ...
+    squeeze(lcall(:,2,:)), squeeze(lambda(lcall(:,2,:),par)),'g-', ...
+    squeeze(lcall(:,3,:)), squeeze(lambda(lcall(:,3,:),par)),'r-', ...
     'LineWidth',2);
 axis tight;
 xlabel('lc');
@@ -427,80 +481,159 @@ xlabel('Time (s)');
 ylabel('lc');
 
 subplot(2,1,2);
-fx = cat(3,L0data.fexp);
-fx = reshape(fx,[4 size(L0data)]);
+fx = cat(3,L1data.fexp);
+fx = reshape(fx,[5 size(L1data)]);
 plot(phitest2,squeeze(fx(1,:,:)),'o-');
 xlabel('Activation phase');
 ylabel('Mode 1 exponent');
 
+vals = fullfact([2 2 2 2]);
+islen = vals(:,1) == 2;
+isvel = vals(:,2) == 2;
+iswork = vals(:,3) == 2;
+isstiff = vals(:,4) == 2;
 if (~getvar('NLdata') || ~inputyn('Use existing data?', 'default',true))
+    par0 = par;
+    
     NLdata = struct([]);
-    for i = 1:2
-        switch i
-            case 1
-                lambda2 = -2.23;
-            case 2
-                lambda2 = 0;
+    for i = 1:length(islen)
+        if (islen(i))
+            par.lambda2 = par0.lambda2;
+        else
+            par.lambda2 = 0;
         end
-        for j = 1:2
-            switch j
-                case 1
-                    xm = 0.4;
-                    xp = 1.33;
-                case 2
-                    xm = 0;
-                    xp = 0;
-            end
+        if (isvel(i))
+            par.alpham = par0.alpham;
+            par.alphap = par0.alphap;
+        else
+            par.alpham = 0;
+            par.alphap = 0;
+        end
+        if (iswork(i))
+            par.km1 = par0.km1;
+        else
+            par.km1 = 0;
+        end
+        if (isstiff(i))
+            par.mu1 = par0.mu1;
+        else
+            par.mu1 = 0;
+        end
+        
+        for k = 1:length(phitest2)
+            phi = phitest2(k);
 
-            for k = 1:length(phitest2)
-                phi = phitest2(k);
-                
-                L = @(t) L0 + A * cos(2*pi/T * (t - phi));
-                X0 = [L(0) - ls0   0   0   0];
+            par.L = @(t) par.L1 + par.A * cos(2*pi/par.T * (t - phi));
+            par.V = @(t) -2*pi/par.T * par.A * sin(2*pi/par.T * (t - phi));
+            X0 = [0   0   0   0   1];
 
-                [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x), 0.005, T, X0, ...
-                    'Display','iter-detailed', 'fixedperiod',true, 'initialcycles',2, 'TolX',1e-8, 'RelTol',1e-6);
-                data1.Pc = Pc(data1.x(:,1), data1.x(:,2), data1.x(:,4));
+            [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x, par), 0.005, par.T, X0, ...
+                'Display','iter-detailed', 'fixedperiod',true, 'initialcycles',2, 'TolX',1e-8, 'RelTol',1e-6);
 
-                data1 = get_floquet(data1,@(t,x) jfcn(t,x), 100);
-                data1.L = L;
+            data1.lc = par.L(data1.t) - data1.x(:,1);
+            data1.vc = par.V(data1.t) - data1.x(:,2);
+            data1.Pc = Pc(data1.lc, data1.vc, data1.x(:,4), par);
 
-                NLdata = makestructarray(NLdata,data1);
-            end
+            data1 = get_floquet(data1,@(t,x) jfcn(t,x, par), 100);
+            data1.L = par.L;
+            data1.islen = islen(i);
+            data1.isvel = isvel(i);
+            data1.iswork = iswork(i);
+            data1.isstiff = isstiff(i);
+            
+            NLdata = makestructarray(NLdata,data1);
+            putvar NLdata;
         end
     end
-    NLdata = reshape(NLdata,[length(phitest2) 2 2]);
+    NLdata = reshape(NLdata,[length(phitest2) length(islen)]);
+
     putvar NLdata;
-
-
-    lambda2 = -2.23;
-    xm = 0.4;
-    xp = 1.33;
+    par = par0;
 end
+
+figureseries('Floquet exp vs nonlin');
+clf;
+subplot(2,3,6);
+fx = cat(3,NLdata.fexp);
+fx = reshape(fx,[5 size(NLdata)]);
+
+clf;
+yl = [Inf -Inf];
+hax = zeros(4,1);
+for i = 1:4,
+    switch i
+        case 1
+            good = ~islen & ~isvel;
+            ttl = 'fl=0, fv=0';
+        case 2
+            good = islen & ~isvel;
+            ttl = 'fv=0';
+        case 3
+            good = ~islen & isvel;
+            ttl = 'fl=0';
+        case 4
+            good = islen & isvel;
+            ttl = 'all';
+    end
+    hax(i) = subplot(2,2,i);
+    plot(phitest2, squeeze(real(fx(1,:,good))));
+    xlabel('Activation phase');
+    ylabel('Mode 1 exponent');
+    title(ttl);
+    if (i == 1)
+        legend('none','stiff=0','work=0','both');
+    end
+    yl1 = ylim;
+    if (yl1(1) < yl(1))
+        yl(1) = yl1(1);
+    end
+    if (yl1(2) > yl(2))
+        yl(2) = yl1(2);
+    end
+end
+set(hax,'YLim',yl);
+
 
 Pcnl = cat(2,NLdata.Pc);
 Pcnl = reshape(Pcnl, [size(Pcnl,1) size(NLdata)]);
 
 figureseries('Nonlinearity effect');
 clf;
-for i = 1:5,
-    subplot(2,3,i);
-    plot(t, flatten(Pcnl(:,i,:,:),2:4));
+j = 4;
+yl = [Inf -Inf];
+hax = zeros(4,1);
+for i = 1:4,
+    switch i
+        case 1
+            good = ~islen & ~isvel;
+            ttl = 'fl=0, fv=0';
+        case 2
+            good = islen & ~isvel;
+            ttl = 'fv=0';
+        case 3
+            good = ~islen & isvel;
+            ttl = 'fl=0';
+        case 4
+            good = islen & isvel;
+            ttl = 'all';
+    end
+    hax(i) = subplot(2,2,i);
+    plot(t, squeeze(Pcnl(:,j,good)));
     xlabel('Time (s)');
     ylabel('Force (mN)');
-    
-    if (i == 3)
-        legend('normal','fv=0','fl=0','both', 'location','best');
+    title(ttl);
+    if (i == 1)
+        legend('none','stiff=0','work=0','both');
+    end
+    yl1 = ylim;
+    if (yl1(1) < yl(1))
+        yl(1) = yl1(1);
+    end
+    if (yl1(2) > yl(2))
+        yl(2) = yl1(2);
     end
 end
-
-
-subplot(2,3,6);
-fx = cat(3,NLdata.fexp);
-fx = reshape(fx,[4 size(NLdata)]);
-plot(phitest2,squeeze(fx(1,:,:)),'o-');
-xlabel('Activation phase');
-ylabel('Mode 1 exponent');
+set(hax,'YLim',yl);
 
 Btest = [5 10 15 20];
 if (~getvar('Bdata') || ~inputyn('Use existing B data?', 'default',true))
@@ -592,42 +725,56 @@ title('Mode one time constant vs k3 and k4');
 
 
 %--------------------------------------------------------
-function [hx,dhx] = h(x)
+function [hx,dhx] = h(x, par)
 
-exs = exp(x/s);
-hx = s * log(1 + exs);
+exs = exp(x/par.s);
+hx = par.s * log(1 + exs);
 if (nargout == 2)
     dhx = exs ./ (1 + exs);
 end
 
-function [hl,dl] = lambda(lc)
+function [gx,dgx] = g(x, par)
 
-l0 = 1 + lambda2 * (lc - lc0).^2;
-if (nargout == 1)
-    hl = h(l0);
-else
-    [hl,dhl] = h(l0);
-    dl = 2.*lambda2.*(lc - lc0) .* dhl;
+e2xs = exp(-2*x/par.s);
+gx = 1./(1+e2xs);
+
+if (nargout == 2)
+    dgx = -2*e2xs ./ (1+e2xs);
 end
 
-function [x,dx] = xi(vc)
+function [hl,dl] = lambda(lc, par)
+
+l0 = 1 + par.lambda2 * (lc - par.lc0).^2;
+if (nargout == 1)
+    hl = h(l0, par);
+else
+    [hl,dhl] = h(l0, par);
+    dl = 2.*par.lambda2.*(lc - par.lc0) .* dhl;
+end
+
+function [x,dx] = alpha(vc, par)
 
 if (nargout == 1)
-    x0 = 1 + xp * h(vc) - xm * h(-vc);
-    x = h(x0);
+    x0 = 1 + par.alphap * h(vc,par) - par.alpham * h(-vc,par);
+    x = h(x0,par);
 else
-    [hvcp,dhvcp] = h(vc);
-    [hvcm,dhvcm] = h(-vc);
-    x0 = 1 + xp * hvcp - xm * hvcm;
-    [x,dhx] = h(x0);
+    [hvcp,dhvcp] = h(vc,par);
+    [hvcm,dhvcm] = h(-vc,par);
+    x0 = 1 + par.alphap * hvcp - par.alpham * hvcm;
+    [x,dhx] = h(x0,par);
 
-    dx = (xm .* dhvcm + xp .* dhvcp) .* ...
+    dx = (par.alpham .* dhvcm + par.alphap .* dhvcp) .* ...
         dhx;
 end
 
-function p = Pc(lc, vc, Caf)
+function p = Pc(lc, vc, Caf, par)
 
-p = P0 .* lambda(lc) .* xi(vc) .* Caf;
+p = lambda(lc,par) .* alpha(vc,par) .* Caf;
+
+
+function x = mu(Caf, par)
+
+x = par.mu0 + par.mu1*Caf;
 
 
 function dx = odefcn(t,x, par)
@@ -645,11 +792,11 @@ Vval = par.V(t);
 lc = Lval - ls;
 vc = Vval - vs;
 
-gact = g(actval, par);
+gact = g(actval-0.5, par);
 
 Pcval = Pc(lc,vc,Caf, par);
 
-dm = par.km1*Pcval.*h(-vc, par) - par.km2*(m-1).*g(vc+0.5, par);
+dm = par.km1*Pcval.*h(-vc, par) - par.km2*(m-1).*g(vc, par);
 
 k3 = par.k30 ./ sqrt(m);
 k4 = par.k40 .* sqrt(m);
@@ -668,53 +815,80 @@ dx = [dls; dvs; dCa; dCaf; dm];
 
 
     
-function J = jfcn(t,x)
+function J = jfcn(t,x, par)
 
 % From Mathematica:
-% J = [0,1,0,0;M.^(-1).*((-1).*\[Mu]+(-1).*Caf.*P0.*xi(vc).*d(lambda)( ...
-%  lc)),M.^(-1).*((-1).*B+(-1).*Caf.*P0.*lambda(lc).*d(xi)(vc)) ...
-% ,0,(-1).*M.^(-1).*P0.*lambda(lc).*xi(vc);0,0,(-1).*(1+(-1).* ...
-% Caf).*k3+(-1).*Ca.*k2.*(1+(-1).*g(act(t)))+k2.*((-1).*Ca+( ...
-% -1).*Caf+Cb+(-1).*Sb).*(1+(-1).*g(act(t)))+(-1).*k1.*g(act( ...
-% t)),Ca.*k3+(1+(-1).*Caf).*k4+(-1).*Caf.*k4+(-1).*Ca.*k2.*(1+ ...
-% (-1).*g(act(t)))+(-1).*k1.*g(act(t));0,0,(1+(-1).*Caf).*k3,( ...
-% -1).*Ca.*k3+(-1).*(1+(-1).*Caf).*k4+Caf.*k4];
-%
-% d(xi) = (xim.*d(h)((-1).*vc)+xip.*d(h)(vc)).*d(h)(1+(-1).*xim.*h(( ...
-%    -1).*vc)+xip.*h(vc));
-%
-% d(lambda) = 2.*lambda2.*(lc+(-1).*lc0).*d(h)(1+lambda2.*(lc+(-1).*lc0) ...
-%  .^2);
-%
-% d(h) = exp(1).^(s.^(-1).*x).*(1+exp(1).^(s.^(-1).*x)).^(-1)
-%
-% d(g) = exp(1).^(2+(-1).*((-0.5E0)+act).*s.^(-1)).*(1+exp(1).^(2+( ...
-% -1).*((-0.5E0)+act).*s.^(-1))).^(-2).*s.^(-1);
+% [0,1,0,0,0;mm.^(-1).*((-1).*mu0+(-1).*Caf.*mu1+(-1).*Caf.*alpha(V+ ...
+%   (-1).*vs).*Derivative(1)(lambda)(L+(-1).*ls)),mm.^(-1).*((-1).*b+( ...
+%   -1).*Caf.*lambda(L+(-1).*ls).*Derivative(1)(alpha)(V+(-1).*vs)),0, ...
+%   mm.^(-1).*((-1).*ls.*mu1+alpha(V+(-1).*vs).*lambda(L+(-1).*ls)),0; ...
+%   0,0,(-1).*(1+(-1).*Caf).*k30.*m.^(-1/2)+(-1).*Ca.*k2.*(1+(-1).*g(( ...
+%   -0.5E0)+a))+k2.*(C+(-1).*Ca+(-1).*Caf+(-1).*S).*(1+(-1).*g(( ...
+% -0.5E0)+a))+(-1).*k1.*g((-0.5E0)+a),Ca.*k30.*m.^(-1/2)+(1+(-1).* ...
+%  Caf).*k40.*m.^(1/2)+(-1).*Caf.*k40.*m.^(1/2)+(-1).*Ca.*k2.*(1+(-1) ...
+%   .*g((-0.5E0)+a))+(-1).*k1.*g((-0.5E0)+a),(1+(-1).*Caf).*((1/2).* ...
+%   Ca.*k30.*m.^(-3/2)+(1/2).*Caf.*k40.*m.^(-1/2));0,0,(1+(-1).*Caf).* ...
+%   k30.*m.^(-1/2),(-1).*Ca.*k30.*m.^(-1/2)+(-1).*(1+(-1).*Caf).*k40.* ...
+%   m.^(1/2)+Caf.*k40.*m.^(1/2),(1+(-1).*Caf).*((-1/2).*Ca.*k30.*m.^( ...
+%   -3/2)+(-1/2).*Caf.*k40.*m.^(-1/2));(-1).*Caf.*km1.*alpha(V+(-1).* ...
+%   vs).*h((-1).*V+vs).*Derivative(1)(lambda)(L+(-1).*ls),(-1).*Caf.* ...
+%   km1.*h((-1).*V+vs).*lambda(L+(-1).*ls).*Derivative(1)(alpha)(V+( ...
+%   -1).*vs)+km2.*((-1)+m).*Derivative(1)(g)(V+(-1).*vs)+Caf.*km1.* ...
+%   alpha(V+(-1).*vs).*lambda(L+(-1).*ls).*Derivative(1)(h)((-1).*V+ ...
+%   vs),0,km1.*alpha(V+(-1).*vs).*h((-1).*V+vs).*lambda(L+(-1).*ls),( ...
+%   -1).*km2.*g(V+(-1).*vs)];
 
-lc = x(1,:);
-vc = x(2,:);
+ls = x(1,:);
+vs = x(2,:);
 Ca = x(3,:);
 Caf = x(4,:);
+m = x(5,:);
 
-[l,dl] = lambda(lc);
-[x,dx] = xi(vc);
-actval = act(t);
-gact = 1./(1+exp(2-(actval-0.5)/s));
+sqm = sqrt(m);
 
-J = [0,1,0,0; ...
+Lval = par.L(t);
+Vval = par.V(t);
+
+lc = Lval - ls;
+vc = Vval - vs;
+
+[lambdaval,dl] = lambda(lc, par);
+[alphaval,da] = alpha(vc, par);
+actval = par.act(t);
+gact = g(actval-0.5, par);
+[gvc,dg] = g(vc,par);
+
+hvcm = h(-vc,par);
+
+muval = mu(Caf, par);
+
+J = [0,1,0,0,0; ...
     ...
-    1/M .* (-mu - Caf .* P0 .* x .* dl), ...
-    1/M .* (-B - Caf .* P0 .* l .* dx), ...
+    1/par.mm .* (-muval - Caf.*par.mu1 - dl.*alphaval.*Caf), ...
+    1/par.mm .* (-par.b - lambdaval.*da.*Caf), ...
     0, ...
-    -1/M .* P0 .* l .* x; ...
+    1/par.mm .* (-ls.*par.mu1 + alphaval.*lambdaval),...
+    0; ...
     ...
-    0, 0, ...
-    -(1 - Caf) .* k3 - Ca .* k2 .* (1 - gact) + ...
-    k2 .*(-Ca - Caf + C - S) .* (1 - gact) - k1 .* gact, ...
-    Ca .* k3 + (1 - Caf).*k4 - Caf.*k4 - Ca.*k2 .* (1 - gact) - ...
-    k1 .* gact;...
+    0, ...
+    0, ...
+    -(1 - Caf).*par.k30./sqm - Ca.*par.k2.*(1 - gact) + ...
+            par.k2.*(par.C - par.S - Ca - Caf) .* (1 - gact) - par.k1 .* gact, ...
+    Ca.*par.k30./sqm + (1 - 2*Caf).*par.k40.*sqm - Ca.*par.k2.*(1 - gact) - par.k1.*gact, ...
+    (1 - Caf) .* (0.5.*Ca .* par.k30 .* m.^-1.5 + 0.5.*Caf.*par.k40./sqm); ...
     ...
-    0, 0, (1 - Caf).*k3, -Ca.*k3 - (1 - Caf).*k4 + Caf.*k4];
+    0, ...
+    0, ...
+    (1 - Caf) .* par.k30./sqm, ...
+    -Ca.*par.k30./sqm - (1 - 2*Caf).*par.k40.*sqm,...
+    (1 - Caf) .* (-0.5.*Ca.*par.k30.*m.^-1.5 - 0.5.*Caf.*par.k40./sqm); ...
+    ...
+    -Caf.*par.km1.*alphaval .* hvcm .* dl, ...
+    -Caf.*par.km1.*hvcm.*lambdaval.*da + par.km2.*(m-1).*dg + ...
+            Caf.*par.km1.*alphaval.*lambdaval.*hvcm,...
+    0,...
+    par.km1.*alphaval.*hvcm.*lambdaval,...
+    -par.km2.*gvc];
 
 
 

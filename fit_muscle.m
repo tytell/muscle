@@ -1,5 +1,9 @@
 function fit_muscle
 
+%optimization 2
+%m = 0.056475; b = 0.283269; lc0 = 0.965423; k1 = 6.88101; k2 = 30.2333; 
+%k30 = 45.6537; k40 = 17.3768; km1 = 19.414; km2 = 6.39595    ->> sum(dx^2) = 6.350151
+
 par.T = 1;              % sec
 par.mu0 = 1;
 par.mu1 = 23;
@@ -246,36 +250,88 @@ end
 
 %one good optimum:
 %m = 0.061635; b = 0.211072; lc0 = 0.969523    ->> sum(dx^2) = 0.001688
+%(optimizing just the peak values)
 
-i2 = 2;
-j2 = 4;
-fprintf('Start at m = %f, b = %f\n', mtest(i2),btest(j2));
-optopt = optimset('Display','iter-detailed','FunValCheck','on', ...
-    'UseParallel','always', 'DiffMinChange',0.1);
-%par.phi = par.phi(3);
-par.model = 'ls';
 param0 = [mtest(i2); btest(j2); par.lc0; par.k1; par.k2;...
           par.k30; par.k40; par.km1; par.km2];
+if inputyn('Run optimization again?', 'default',false)
+    i2 = 2;
+    j2 = 4;
+    fprintf('Start at m = %f, b = %f\n', mtest(i2),btest(j2));
+    optopt = optimset('Display','iter-detailed','FunValCheck','on', ...
+        'UseParallel','always', 'DiffMinChange',0.1);
+    %par.phi = par.phi(3);
+    par.model = 'ls';
 
-[param,resnorm,residual,exitflag,output] = ...
-    lsqnonlin(@(p) fit_muscle_fcn(p,@muscle_ode_fcn,par), param0, [], [], optopt);
+    [param,resnorm,residual,exitflag,output] = ...
+        lsqnonlin(@(p) fit_muscle_fcn(p,@muscle_ode_fcn,par), param0, [], [], optopt);
 
-disp(param);
-save('fit_muscle_opt.mat','param','resnorm','residual','exitflag','output');
+    disp(param);
+    save('fit_muscle_opt.mat','param','resnorm','residual','exitflag','output');
+end
+
+param(1,:) = param0;
+param(1,1:3) = [0.061635 0.211072 0.969523];
+param(2,:) = [0.0542    0.2802    0.9678    6.7281   23.2794   51.3537  ...
+    19.3801   17.5804 6.0156];
+param(3,:) = [0.0565    0.2833    0.9654    6.8810   30.2333   45.6537  ...
+    17.3768   19.4140 6.3959];
 
 par.phi = musc.phi;
-[dxfit,Pcfit,datafit] = fit_muscle_fcn(param, @muscle_ode_fcn, par);
+[dx1,~,datafit1] = fit_muscle_fcn(param(1,:), @muscle_ode_fcn, par);
+[dx2,~,datafit2] = fit_muscle_fcn(param(2,:), @muscle_ode_fcn, par);
+[dx3,~,datafit3] = fit_muscle_fcn(param(3,:), @muscle_ode_fcn, par);
+
+dx1 = reshape(dx1,size(datafit1.Pc));
+dx2 = reshape(dx2,size(datafit1.Pc));
+dx3 = reshape(dx3,size(datafit1.Pc));
+
+datafit0.Pc = zeros(size(datafit1.Pc));
+datafit0.Pcdat = zeros(size(datafit1.Pc));
+dx0 = zeros(size(dx1));
+for i = 1:length(par.phi)
+    good = isfinite(musc.tmod);
+    Pc1 = interp1(musc.tmod(good),musc.Fmod(good,i), t0);
+    Pcdat1 = interp1(musc.tdata,musc.Fdata(:,i), t0);
+    
+    datafit0.Pc(:,i) = Pc1 / par.P0;
+    datafit0.Pcdat(:,i) = Pcdat1 / par.P0;
+    
+    dx0(:,i) = (Pc1 - Pcdat1)/par.P0;
+end
+
+dxold = reshape(dxold, size(dataold.Pc));
 
 figureseries('Fit comparison');
 clf;
+h(1) = subplot(2,1,1);
+h(2) = subplot(2,1,2);
 for k = 1:10
-    addplot(t0+k-1,datafit.Pcdat(:,k), 'k-', ...
-        t0+k-1,datafit.Pc(:,k), 'b--',...
+    addplot(h(1), t0+k-1,datafit1.Pcdat(:,k), 'k-', ...
+        t0+k-1,datafit1.Pc(:,k), 'b--',...
+        t0+k-1,datafit2.Pc(:,k), 'g--',...
+        t0+k-1,datafit3.Pc(:,k), 'r--',...
         'LineWidth',2);
-    addplot(t0+k-1,dataold.Pc(:,k), 'r-', ...
-        musc.tmod+k-1, musc.Fmod(:,k)/par.P0, 'm-');
+    addplot(h(1), t0+k-1,datafit0.Pc(:,k), 'm-', ...
+        t0+k-1,dataold.Pc(:,k));
+    
+    addplot(h(2),t0+k-1,dx1(:,k), 'b--',...
+        t0+k-1,dx2(:,k), 'g--',...
+        t0+k-1,dx3(:,k), 'r--',...
+        'LineWidth',2);
+    addplot(h(2), t0+k-1,dx0(:,k), 'm-', ...
+        t0+k-1,dxold(:,k), 'c-');
 end
 
+legend(h(1), 'data','1','2','3','T0','T1');
+xlabel(h(2), 'Time (sec)');
+ylabel(h(1), 'Pc (scaled)');
+ylabel(h(2), 'Difference from data');
+
+fprintf('Sums of squares:\n');
+fprintf('My models: %g %g %g\n', sum(dx1(:).^2),sum(dx2(:).^2),sum(dx3(:).^2));
+fprintf('Thelma''s reported data: %g\n', nansum(dx0(:).^2));
+fprintf('My implementation of Thelma''s model: %g\n', nansum(dxold(:).^2));
 return;
 
 if (~getvar('fitdata') || ~inputyn('Use existing fit data?', 'default',true))
