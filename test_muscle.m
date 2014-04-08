@@ -62,7 +62,7 @@ if (~getvar('-file',filename,'data') || ~inputyn('Use existing data?', 'default'
         'fmode',zeros(n,5,5));
     data = repmat(data,[1 length(phitest)]);
     
-    fprintf('Phi test:\n');
+    progress(0,length(phitest),'Phi test');
     for i = 1:length(phitest)
         phi1 = phitest(i);
         
@@ -82,7 +82,7 @@ if (~getvar('-file',filename,'data') || ~inputyn('Use existing data?', 'default'
         data1 = get_floquet(data1,@(t,x) jfcn(t,x,par), 100);
         data(i) = data1;
         
-        fprintf('%d/%d (%d%%)\n', i,length(phitest));
+        progress(i);
     end
     putvar('-file',filename,'data');
 end
@@ -221,6 +221,7 @@ if (~getvar('-file',filename,'pertdata') || ~inputyn('Use existing data?', 'defa
         0 0.5 0 0 0;
         0 0 0 -0.1 0];
 
+    progress(0,length(phipert),'Perturbation test');
     pertdata = struct([]);
     odeopt = odeset('RelTol',1e-6);
     for j = 1:length(phipert)
@@ -252,6 +253,7 @@ if (~getvar('-file',filename,'pertdata') || ~inputyn('Use existing data?', 'defa
         pertdata(i,j).lc = lc1;
         pertdata(i,j).vc = vc1;
         pertdata(i,j).Pc = Pc1;
+        progress(j);
     end
     
     putvar('-file',filename,'pertdata');
@@ -314,7 +316,7 @@ if (~getvar('-file',filename,'devdata','Pcdevall','W0','Wdev') || ~inputyn('Use 
     
     n = 1;
     N = length(data) * length(phitest);
-    timedWaitBar(0, 'Computing deviations...');
+    progress(0,N, 'Computing deviations...');
     odeopt = odeset('RelTol',1e-6);
     for i = 1:length(data)
         t0 = data(i).t;
@@ -382,7 +384,7 @@ if (~getvar('-file',filename,'devdata','Pcdevall','W0','Wdev') || ~inputyn('Use 
                         
             n = n+1;
             
-            timedWaitBar(n/N, 'Computing deviations...');
+            progress(n);
         end
         putvar('-file',filename,'devdata','Pcdevall','W0','Wdev');
         %pause;
@@ -448,6 +450,9 @@ phitest2 = 0:0.2:0.8;
 if (~getvar('-file',filename,'L1data') || ~inputyn('Use existing data?', 'default',true))
     L1orig = par.L1;
     L1data = struct([]);
+    N = length(phitest2)*length(L1test);
+    n = 1;
+    progress(0,N, 'Length test');
     for i = 1:length(phitest2)
         phi = phitest2(i);
         for j = 1:length(L1test)
@@ -468,6 +473,8 @@ if (~getvar('-file',filename,'L1data') || ~inputyn('Use existing data?', 'defaul
             data1.L = par.L;
             data1.V = par.V;
             L1data = makestructarray(L1data,data1);
+            n = n+1;
+            progress(n);
         end
     end
     L1data = reshape(L1data,[length(L1test) length(phitest2)]);
@@ -516,6 +523,9 @@ isstiff = vals(:,4) == 2;
 if (~getvar('-file',filename,'NLdata') || ~inputyn('Use existing data?', 'default',true))
     par0 = par;
     
+    N = length(islen)*length(phitest2);
+    n = 0;
+    progress(0,N, 'Nonlinear calculations');
     NLdata = struct([]);
     for i = 1:length(islen)
         if (islen(i))
@@ -564,7 +574,9 @@ if (~getvar('-file',filename,'NLdata') || ~inputyn('Use existing data?', 'defaul
             data1.isstiff = isstiff(i);
             
             NLdata = makestructarray(NLdata,data1);
-            %putvar('-file',filename,'NLdata');
+            putvar('-file',filename,'NLdata');
+            n = n+1;
+            progress(n);
         end
     end
     NLdata = reshape(NLdata,[length(phitest2) length(islen)]);
