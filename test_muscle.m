@@ -61,6 +61,8 @@ if (~getvar('-file',filename,'data') || ~inputyn('Use existing data?', 'default'
         'jfcn',@(t,x) jfcn(t,x,par), 'fx',zeros(n,5,5), 'fexp',zeros(5,1), ...
         'fmode',zeros(n,5,5));
     data = repmat(data,[1 length(phitest)]);
+    
+    fprintf('Phi test:\n');
     for i = 1:length(phitest)
         phi1 = phitest(i);
         
@@ -79,6 +81,8 @@ if (~getvar('-file',filename,'data') || ~inputyn('Use existing data?', 'default'
         
         data1 = get_floquet(data1,@(t,x) jfcn(t,x,par), 100);
         data(i) = data1;
+        
+        fprintf('%d/%d (%d%%)\n', i,length(phitest));
     end
     putvar('-file',filename,'data');
 end
@@ -203,7 +207,7 @@ if (~getvar('-file',filename,'pertdata') || ~inputyn('Use existing data?', 'defa
     t0 = data(i).t;
     xbase = data(i).x;
     Pcbase = data(i).Pc;
-    lcbase = data(i).lc;s
+    lcbase = data(i).lc;
     vcbase = data(i).vc;
     
     phi1 = phitest(i);
@@ -262,7 +266,10 @@ Pcbase = pertdata(i,1).Pcbase;
 lcbase = pertdata(i,1).lcbase;
 vcbase = pertdata(i,1).vcbase;
 
-hax = tight_subplot(4,1, 0.02,[0.12 0.01],[0.12 0.01]);
+hax = zeros(4,1);
+for j = 1:4
+    hax(j) = subplot(4,1,j);
+end
 
 plot(hax(1), t0,lcbase, 'k-', 'LineWidth',2);
 plot(hax(2), t0,vcbase, 'k-', 'LineWidth',2);
@@ -557,7 +564,7 @@ if (~getvar('-file',filename,'NLdata') || ~inputyn('Use existing data?', 'defaul
             data1.isstiff = isstiff(i);
             
             NLdata = makestructarray(NLdata,data1);
-            putvar('-file',filename,'NLdata');
+            %putvar('-file',filename,'NLdata');
         end
     end
     NLdata = reshape(NLdata,[length(phitest2) length(islen)]);
