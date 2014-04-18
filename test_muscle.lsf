@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# the name of your job showing on the queue system
+#BSUB -J tytellmusc
+#BSUB -q normal_public6
+
+# the system output and error message output, %J will show as your jobID
+#BSUB -o %J.out
+#BSUB -e %J.err
+
+#enter your working directory
+cd ~etytel01/Matlab/muscle
+
+# Finally, Start the program
+matlab -nodisplay < run_test_muscle.m > test_muscle.out
