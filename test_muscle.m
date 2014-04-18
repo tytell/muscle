@@ -3,7 +3,8 @@ function test_muscle
 %optimized parameters:
 %2: m = 0.0542; b = 0.2802; lc0 = 0.9678; k1 = 6.7281; k2 = 23.2794; k30 = 51.3537; k40 = 19.3801; km1 = 17.5804; km2 = 6.0156    ->> sum(dx^2) = 6.056118
 
-filename = 'test_muscle.mat';
+filename = '~etytel01/Matlab/muscle/test_muscle.mat';
+nlfilename = '~etytel01/Matlab/muscle/test_muscle_nonlin.mat';
 
 par.L0 = 2.94;                  % mm
 par.Lis = 2.7;                  % mm
@@ -32,7 +33,7 @@ par.alphap = 2.9;
 par.alphamax = 1.8;
 
 par.mu0 = 1;
-par.mu1 = 23;
+ppar.mu1 = 23;
 
 par.s = 0.05;
 
@@ -520,14 +521,28 @@ islen = vals(:,1) == 2;
 isvel = vals(:,2) == 2;
 iswork = vals(:,3) == 2;
 isstiff = vals(:,4) == 2;
-if (~getvar('-file',filename,'NLdata') || ~inputyn('Use existing data?', 'default',true))
+N = length(islen)*length(phitest2);
+nldone = false;
+if (getvar('-file',nlfilename','NLdata') && ...
+    (numel(NLdata) == N))
+    nldone = true;
+end
+
+if (~nldone || ~inputyn('Use existing data?', 'default',true))
     par0 = par;
     
-    N = length(islen)*length(phitest2);
-    n = 0;
     progress(0,N, 'Nonlinear calculations');
-    NLdata = struct([]);
-    for i = 1:length(islen)
+    if ~exist('NLdata','var')
+        NLdata = struct([]);
+        n = 0;
+        i0 = 1;
+    else
+        i0 = floor(length(NLdata)/length(phitest2));
+        n = i0*length(phitest);
+        NLdata = NLdata(1:n);
+        i0 = i0+1;
+    end
+    for i = i0:length(islen)
         if (islen(i))
             par.lambda2 = par0.lambda2;
         else
@@ -574,7 +589,7 @@ if (~getvar('-file',filename,'NLdata') || ~inputyn('Use existing data?', 'defaul
             data1.isstiff = isstiff(i);
             
             NLdata = makestructarray(NLdata,data1);
-            putvar('-file',filename,'NLdata');
+            putvar('-file',nlfilename,'NLdata');
             n = n+1;
             progress(n);
         end
