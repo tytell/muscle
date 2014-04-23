@@ -5,6 +5,7 @@ function test_muscle
 
 filename = '~etytel01/Matlab/muscle/test_muscle.mat';
 nlfilename = '~etytel01/Matlab/muscle/test_muscle_nonlin.mat';
+quiet = true;
 
 par.L0 = 2.94;                  % mm
 par.Lis = 2.7;                  % mm
@@ -33,7 +34,7 @@ par.alphap = 2.9;
 par.alphamax = 1.8;
 
 par.mu0 = 1;
-ppar.mu1 = 23;
+par.mu1 = 23;
 
 par.s = 0.05;
 
@@ -51,7 +52,7 @@ showphi = [1 6 11 17];
 
 pertmag = 0.1;
     
-if (~getvar('-file',filename,'data') || ~inputyn('Use existing data?', 'default',true))
+if (~getvar('-file',filename,'data') || (~quiet && ~inputyn('Use existing data?', 'default',true)))
     n = par.T / dt + 1;
     z = zeros(n,1);
     z5 = zeros(n,5);
@@ -63,7 +64,7 @@ if (~getvar('-file',filename,'data') || ~inputyn('Use existing data?', 'default'
         'fmode',zeros(n,5,5));
     data = repmat(data,[1 length(phitest)]);
     
-    progress(0,length(phitest),'Phi test');
+    progress(0,length(phitest),'**** Phi test');
     for i = 1:length(phitest)
         phi1 = phitest(i);
         
@@ -203,7 +204,7 @@ end
 legend([h1(1); h2], 'steady','lc','vc','Ca','Caf','m','Location','best');
 print('-dpdf','DevVsPhi.pdf');
 
-if (~getvar('-file',filename,'pertdata') || ~inputyn('Use existing data?', 'default',true))
+if (~getvar('-file',filename,'pertdata') || (~quiet &&~inputyn('Use existing data?', 'default',true)))
     i = 3;
     t0 = data(i).t;
     xbase = data(i).x;
@@ -222,7 +223,7 @@ if (~getvar('-file',filename,'pertdata') || ~inputyn('Use existing data?', 'defa
         0 0.5 0 0 0;
         0 0 0 -0.1 0];
 
-    progress(0,length(phipert),'Perturbation test');
+    progress(0,length(phipert),'**** Perturbation test');
     pertdata = struct([]);
     odeopt = odeset('RelTol',1e-6);
     for j = 1:length(phipert)
@@ -305,7 +306,8 @@ xlabel(hax(4),'Time (sec)');
 set(hax,'Box','off', 'TickDir','out');
 print('-dpdf','Pert.pdf');
 
-if (~getvar('-file',filename,'devdata','Pcdevall','W0','Wdev') || ~inputyn('Use existing data?', 'default',true))
+if (~getvar('-file',filename,'devdata','Pcdevall','W0','Wdev') || ...
+    (~quiet && ~inputyn('Use existing data?', 'default',true)))
     devdata = struct([]);
     
     figureseries('Test');
@@ -317,7 +319,7 @@ if (~getvar('-file',filename,'devdata','Pcdevall','W0','Wdev') || ~inputyn('Use 
     
     n = 1;
     N = length(data) * length(phitest);
-    progress(0,N, 'Computing deviations...');
+    progress(0,N, '**** Computing deviations...');
     odeopt = odeset('RelTol',1e-6);
     for i = 1:length(data)
         t0 = data(i).t;
@@ -448,12 +450,12 @@ print('-dpdf','ChangeInWorkCont.pdf');
 
 L1test = par.lc0 + [-2*par.A 0 2*par.A];
 phitest2 = 0:0.2:0.8;
-if (~getvar('-file',filename,'L1data') || ~inputyn('Use existing data?', 'default',true))
+if (~getvar('-file',filename,'L1data') || (~quiet && ~inputyn('Use existing data?', 'default',true)))
     L1orig = par.L1;
     L1data = struct([]);
     N = length(phitest2)*length(L1test);
     n = 1;
-    progress(0,N, 'Length test');
+    progress(0,N, '**** Length test');
     for i = 1:length(phitest2)
         phi = phitest2(i);
         for j = 1:length(L1test)
@@ -528,10 +530,10 @@ if (getvar('-file',nlfilename','NLdata') && ...
     nldone = true;
 end
 
-if (~nldone || ~inputyn('Use existing data?', 'default',true))
+if (~nldone || (~quiet && ~inputyn('Use existing data?', 'default',true)))
     par0 = par;
     
-    progress(0,N, 'Nonlinear calculations');
+    progress(0,N, '**** Nonlinear calculations');
     if ~exist('NLdata','var')
         NLdata = struct([]);
         n = 0;
@@ -561,6 +563,7 @@ if (~nldone || ~inputyn('Use existing data?', 'default',true))
             par.km1 = 0;
         end
         if (isstiff(i))
+            par.mu0 = par0.mu0;
             par.mu1 = par0.mu1;
         else
             par.mu0 = par0.mu0 + par0.mu1;
@@ -589,16 +592,18 @@ if (~nldone || ~inputyn('Use existing data?', 'default',true))
             data1.isstiff = isstiff(i);
             
             NLdata = makestructarray(NLdata,data1);
-            putvar('-file',nlfilename,'NLdata');
             n = n+1;
             progress(n);
         end
+        putvar('-file',nlfilename,'NLdata');
     end
     NLdata = reshape(NLdata,[length(phitest2) length(islen)]);
 
     putvar('-file',filename,'NLdata');
     par = par0;
 end
+
+NLdata = reshape(NLdata,[length(phitest2) length(islen)]);
 
 figureseries('Floquet exp vs nonlin');
 clf;
@@ -630,7 +635,7 @@ for i = 1:4,
     ylabel('Mode 1 exponent');
     title(ttl);
     if (i == 1)
-        legend('none','stiff=0','work=0','both');
+        legend('none','stiff=const','work=0','both');
     end
     yl1 = ylim;
     if (yl1(1) < yl(1))
@@ -673,7 +678,7 @@ for i = 1:4,
     ylabel('Force (mN)');
     title(ttl);
     if (i == 1)
-        legend('none','stiff=0','work=0','both');
+        legend('none','stiff=const','work=0','both');
     end
     yl1 = ylim;
     if (yl1(1) < yl(1))
@@ -686,31 +691,34 @@ end
 set(hax,'YLim',yl);
 print('-dpdf','NonLin.pdf');
 
-Btest = [5 10 15 20];
-if (~getvar('-file',filename,'Bdata') || ~inputyn('Use existing B data?', 'default',true))
+Btest = [0.05 0.1 0.28 0.5 1 2];
+if (~getvar('-file',filename,'Bdata') || (~quiet && ~inputyn('Use existing B data?', 'default',true)))
     Bdata = struct([]);
     for i = 1:length(phitest2)
         phi = phitest2(i);
         for j = 1:length(Btest)
-            B = Btest(j);
+            par.b = Btest(j);
             
-            L = @(t) L0 + A * cos(2*pi/T * (t - phi));
-            X0 = [L(0) - ls0   0   0   0];
+            par.L = @(t) par.L1 + par.A * cos(2*pi/par.T * (t - phi));
+            par.V = @(t) -2*pi/par.T * par.A * sin(2*pi/par.T * (t - phi));
+            X0 = [0   0   0   0   1];
 
-            [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x), 0.005, T, X0, ...
+            [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x, par), 0.005, par.T, X0, ...
                 'Display','iter-detailed', 'fixedperiod',true, 'initialcycles',2, 'TolX',1e-8, 'RelTol',1e-6);
-            data1.Pc = Pc(data1.x(:,1), data1.x(:,2), data1.x(:,4));
 
-            data1 = get_floquet(data1,@(t,x) jfcn(t,x), 100);
-            data1.L = L;
-            data1.B = B;
+            data1.lc = par.L(data1.t) - data1.x(:,1);
+            data1.vc = par.V(data1.t) - data1.x(:,2);
+            data1.Pc = Pc(data1.lc, data1.vc, data1.x(:,4), par);
+
+            data1 = get_floquet(data1,@(t,x) jfcn(t,x, par), 100);
+            
+            data1.L = par.L;
+            data1.b = par.b;
             Bdata = makestructarray(Bdata,data1);
         end
     end
     Bdata = reshape(Bdata,[length(Btest) length(phitest2)]);
     putvar('-file',filename,'Bdata');
-    
-    B = 10;
 end
 
 figureseries('Damping effect');
@@ -725,36 +733,40 @@ print('-dpdf','Damping.pdf');
 
 k3test = 0.6:0.1:1.4;
 k4test = [0.8 1 1.2];
-if (~getvar('-file',filename,'k34data') || ~inputyn('Use existing k3 k4 data?', 'default',true))
+if (~getvar('-file',filename,'k34data') || (~quiet && ~inputyn('Use existing k3 k4 data?', 'default',true)))
     phi = 0;
-    k30 = k3;
-    k40 = k4;
+    k30 = par.k3;
+    k40 = par.k4;
     
-    L = @(t) L0 + A * cos(2*pi/T * (t - phi));
-    X0 = [L(0) - ls0   0   0   0];
+    par.L = @(t) par.L1 + par.A * cos(2*pi/par.T * (t - phi));
+    par.V = @(t) -2*pi/par.T * par.A * sin(2*pi/par.T * (t - phi));
+    X0 = [0   0   0   0   1];
     
     k34data = struct([]);
     for i = 1:length(k3test)
-        k3 = k30*k3test(i);
+        par.k3 = k30*k3test(i);
         for j = 1:length(k4test)
-            k4 = k40*k4test(j);
+            par.k4 = k40*k4test(j);
             
-            [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x), 0.005, T, X0, ...
+            [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x, par), 0.005, par.T, X0, ...
                 'Display','iter-detailed', 'fixedperiod',true, 'initialcycles',2, 'TolX',1e-8, 'RelTol',1e-6);
-            data1.Pc = Pc(data1.x(:,1), data1.x(:,2), data1.x(:,4));
 
-            data1 = get_floquet(data1,@(t,x) jfcn(t,x), 100);
-            data1.L = L;
-            data1.k3 = k3;
-            data1.k4 = k4;
+            data1.lc = par.L(data1.t) - data1.x(:,1);
+            data1.vc = par.V(data1.t) - data1.x(:,2);
+            data1.Pc = Pc(data1.lc, data1.vc, data1.x(:,4), par);
+
+            data1 = get_floquet(data1,@(t,x) jfcn(t,x, par), 100);
+            data1.L = par.L;
+            data1.k3 = par.k3;
+            data1.k4 = par.k4;
             k34data = makestructarray(k34data,data1);
         end
     end
     k34data = reshape(k34data,[length(k4test) length(k3test)]);
     putvar('-file',filename,'k34data');
     
-    k3 = k30;
-    k4 = k40;
+    par.k3 = k30;
+    par.k4 = k40;
 end
 
 figureseries('Calcium dynamics effect');
