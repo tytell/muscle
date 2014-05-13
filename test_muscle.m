@@ -518,11 +518,11 @@ xlabel('Activation phase');
 ylabel('Mode 1 exponent');
 print('-dpdf','LengthEffect.pdf');
 
-vals = fullfact([2 2 2 2]);
+vals = fullfact([2 2 2 3]);
 islen = vals(:,1) == 2;
 isvel = vals(:,2) == 2;
 iswork = vals(:,3) == 2;
-isstiff = vals(:,4) == 2;
+stiffval = vals(:,4);
 N = length(islen)*length(phitest2);
 nldone = false;
 if (getvar('-file',nlfilename','NLdata') && ...
@@ -562,12 +562,16 @@ if (~nldone || (~quiet && ~inputyn('Use existing data?', 'default',true)))
         else
             par.km1 = 0;
         end
-        if (isstiff(i))
-            par.mu0 = par0.mu0;
-            par.mu1 = par0.mu1;
-        else
+        switch stiffval(i)
+          case 1
             par.mu0 = par0.mu0 + par0.mu1;
             par.mu1 = 0;
+          case 2
+            par.mu0 = par0.mu0;
+            par.mu1 = 0;
+          case 3
+            par.mu0 = par0.mu0;
+            par.mu1 = par0.mu1;
         end
         
         for k = 1:length(phitest2)
@@ -589,7 +593,7 @@ if (~nldone || (~quiet && ~inputyn('Use existing data?', 'default',true)))
             data1.islen = islen(i);
             data1.isvel = isvel(i);
             data1.iswork = iswork(i);
-            data1.isstiff = isstiff(i);
+            data1.stiffval = stiffval(i);
             
             NLdata = makestructarray(NLdata,data1);
             n = n+1;
@@ -723,7 +727,7 @@ end
 
 figureseries('Damping effect');
 fx = cat(3,Bdata.fexp);
-fx = reshape(fx,[4 size(Bdata)]);
+fx = reshape(fx,[5 size(Bdata)]);
 plot(Btest,log(0.5) ./ real(squeeze(fx(1,:,:))),'o-');
 
 xlabel('Damping coefficient');
@@ -735,8 +739,8 @@ k3test = 0.6:0.1:1.4;
 k4test = [0.8 1 1.2];
 if (~getvar('-file',filename,'k34data') || (~quiet && ~inputyn('Use existing k3 k4 data?', 'default',true)))
     phi = 0;
-    k30 = par.k3;
-    k40 = par.k4;
+    k30 = par.k30;
+    k40 = par.k40;
     
     par.L = @(t) par.L1 + par.A * cos(2*pi/par.T * (t - phi));
     par.V = @(t) -2*pi/par.T * par.A * sin(2*pi/par.T * (t - phi));
@@ -744,9 +748,9 @@ if (~getvar('-file',filename,'k34data') || (~quiet && ~inputyn('Use existing k3 
     
     k34data = struct([]);
     for i = 1:length(k3test)
-        par.k3 = k30*k3test(i);
+        par.k30 = k30*k3test(i);
         for j = 1:length(k4test)
-            par.k4 = k40*k4test(j);
+            par.k40 = k40*k4test(j);
             
             [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x, par), 0.005, par.T, X0, ...
                 'Display','iter-detailed', 'fixedperiod',true, 'initialcycles',2, 'TolX',1e-8, 'RelTol',1e-6);
@@ -757,26 +761,26 @@ if (~getvar('-file',filename,'k34data') || (~quiet && ~inputyn('Use existing k3 
 
             data1 = get_floquet(data1,@(t,x) jfcn(t,x, par), 100);
             data1.L = par.L;
-            data1.k3 = par.k3;
-            data1.k4 = par.k4;
+            data1.k30 = par.k30;
+            data1.k40 = par.k40;
             k34data = makestructarray(k34data,data1);
         end
     end
     k34data = reshape(k34data,[length(k4test) length(k3test)]);
     putvar('-file',filename,'k34data');
     
-    par.k3 = k30;
-    par.k4 = k40;
+    par.k30 = k30;
+    par.k40 = k40;
 end
 
 figureseries('Calcium dynamics effect');
 fx = cat(3,k34data.fexp);
-fx = reshape(fx,[4 size(k34data)]);
-plot(k3test*k3,log(0.5) ./ real(squeeze(fx(1,:,:))),'o-');
+fx = reshape(fx,[5 size(k34data)]);
+plot(k3test*par.k30,log(0.5) ./ real(squeeze(fx(1,:,:))),'o-');
 
 lab = cell(size(k4test));
 for i = 1:length(k4test)
-    lab{i} = sprintf('%.2g',k4test(i)*k4);
+    lab{i} = sprintf('%.2g',k4test(i)*par.k40);
     if (i == 1)
         lab{i} = ['k4 = ' lab{i}];
     end
