@@ -5,6 +5,7 @@ function test_two_muscles
 
 filename = '~etytel01/Matlab/muscle/test_two_muscles.mat';
 quiet = true;
+doplot = false;
 
 par.L0 = 2.94;                  % mm
 par.Lis = 2.7;                  % mm
@@ -71,46 +72,49 @@ X0 = [0   0   0   0    1    ...
       0   0];
 check_jacobian(0,X0', 0.02*ones(12,1), @(t,x) odefcn(t,x,par), @(t,x) jfcn(t,x,par));
 
-tinit = [0 15*par.T];
-odeopt = odeset('RelTol',1e-6); %, 'OutputFcn', @odeplot);
-[t,x] = ode45(@(t,x) odefcn(t,x,par), tinit, X0, odeopt);
+if doplot
+    tinit = [0 15*par.T];
+    odeopt = odeset('RelTol',1e-6); %, 'OutputFcn', @odeplot);
+    [t,x] = ode45(@(t,x) odefcn(t,x,par), tinit, X0, odeopt);
 
-lcL = x(:,Lind) + par.L1 - x(:,ls1ind);
-lcR = par.L1 - x(:,Lind) - x(:,ls2ind);
-vcL = x(:,Vind) - x(:,vs1ind);
-vcR = -x(:,Vind) - x(:,vs2ind);
+    lcL = x(:,Lind) + par.L1 - x(:,ls1ind);
+    lcR = par.L1 - x(:,Lind) - x(:,ls2ind);
+    vcL = x(:,Vind) - x(:,vs1ind);
+    vcR = -x(:,Vind) - x(:,vs2ind);
 
-Pcl = Pc(lcL, vcL, x(:,Caf1ind), par);
-Pcr = Pc(lcR, vcR, x(:,Caf2ind), par);
-figureseries('Time series');
-clf;
-xx = [0 par.duty par.duty 0; 0.5 par.duty+0.5 par.duty+0.5 0.5]';
-yy = [0 0 1 1; 0 0 1 1]';
+    Pcl = Pc(lcL, vcL, x(:,Caf1ind), par);
+    Pcr = Pc(lcR, vcR, x(:,Caf2ind), par);
+    figureseries('Time series');
+    clf;
+    xx = [0 par.duty par.duty 0; 0.5 par.duty+0.5 par.duty+0.5 0.5]';
+    yy = [0 0 1 1; 0 0 1 1]';
 
-xx = repmat(xx,[1 15]);
-xx(:,1:2:end) = xx(:,1:2:end) + repmat(0:14,[4 1]);
-xx(:,2:2:end) = xx(:,2:2:end) + repmat(0:14,[4 1]);
-yy = repmat(yy,[1 15]);
+    xx = repmat(xx,[1 15]);
+    xx(:,1:2:end) = xx(:,1:2:end) + repmat(0:14,[4 1]);
+    xx(:,2:2:end) = xx(:,2:2:end) + repmat(0:14,[4 1]);
+    yy = repmat(yy,[1 15]);
 
-hax(1) = subplot(2,1,1);
-hold on;
-fill(xx(:,1:2:end),yy(:,1:2:end), [0.5 0.5 1]);
-fill(xx(:,2:2:end),yy(:,2:2:end), [0.5 1 0.5]);
-plot(t,Pcl, t,Pcr,'LineWidth',2);
-hold off;
-ylabel('Left muscle');
-axis tight;
+    hax(1) = subplot(2,1,1);
+    hold on;
+    fill(xx(:,1:2:end),yy(:,1:2:end), [0.5 0.5 1]);
+    fill(xx(:,2:2:end),yy(:,2:2:end), [0.5 1 0.5]);
+    plot(t,Pcl, t,Pcr,'LineWidth',2);
+    hold off;
+    ylabel('Left muscle');
+    axis tight;
 
-hax(2) = subplot(2,1,2);
-addmplot(t,x(:,Lind),'k-', t,x(:,Vind),'k:', 'LineWidth',2);
-axis tight;
+    hax(2) = subplot(2,1,2);
+    addmplot(t,x(:,Lind),'k-', t,x(:,Vind),'k:', 'LineWidth',2);
+    axis tight;
 
-linkaxes(hax, 'x');
-set(hax, 'XLim',[12 15]);
-set(hax(1), 'YLim',[0 2]);
+    linkaxes(hax, 'x');
+    set(hax, 'XLim',[12 15]);
+    set(hax(1), 'YLim',[0 2]);
 
-labellines(hax(1), {'left','right'}, 'location',[13.12 13.62]);
-labellines(hax(2), {'L','V'});
+    labellines(hax(1), {'left','right'}, 'location',[13.12 13.62]);
+    labellines(hax(2), {'L','V'});
+    print('-dpdf','test_two_muscles-0.pdf');
+end
 
 if (~getvar('-file',filename,'freqdata') || (~quiet && ~inputyn('Use existing frequency data?', 'default',true)))
     freqdata = struct([]);
@@ -141,133 +145,134 @@ if (~getvar('-file',filename,'freqdata') || (~quiet && ~inputyn('Use existing fr
     putvar('-file',filename,'freqdata');
 end
 
-figureseries('Time series res freq');
-clf;
-xx = [0 par.duty par.duty 0; 0.5 par.duty+0.5 par.duty+0.5 0.5]';
-yy = [0 0 30 30; 0 0 30 30]';
+if doplot
+    figureseries('Time series res freq');
+    clf;
+    xx = [0 par.duty par.duty 0; 0.5 par.duty+0.5 par.duty+0.5 0.5]';
+    yy = [0 0 30 30; 0 0 30 30]';
 
-xx = repmat(xx,[1 2]);
-xx(:,1:2:end) = xx(:,1:2:end) + repmat(0:1,[4 1]);
-xx(:,2:2:end) = xx(:,2:2:end) + repmat(0:1,[4 1]);
-yy = repmat(yy,[1 2]);
+    xx = repmat(xx,[1 2]);
+    xx(:,1:2:end) = xx(:,1:2:end) + repmat(0:1,[4 1]);
+    xx(:,2:2:end) = xx(:,2:2:end) + repmat(0:1,[4 1]);
+    yy = repmat(yy,[1 2]);
 
-ex = [5 15 17];
-t = freqdata(ex(1)).t;
-Pc1 = cat(2,freqdata(ex).Pc);
-Pc1 = Pc1(:,1:2:end);
-Pc2 = freqdata(ex(2)).Pc(:,2);
+    ex = [5 15 17];
+    t = freqdata(ex(1)).t;
+    Pc1 = cat(2,freqdata(ex).Pc);
+    Pc1 = Pc1(:,1:2:end);
+    Pc2 = freqdata(ex(2)).Pc(:,2);
 
-L1 = zeros(size(Pc1));
-for i = 1:3
-    L1(:,i) = freqdata(ex(i)).x(:,9) - L0;
-end
-
-hax(1) = subplot(2,1,1);
-hold on;
-fill(xx(:,1:2:end),yy(:,1:2:end), [0.7 0.7 0.7], 'EdgeColor','none');
-fill(xx(:,2:2:end),yy(:,2:2:end), 'w', 'EdgeColor','k');
-hln = plot([t; t+1],[Pc1; Pc1],'LineWidth',2);
-hln(end+1) = addplot([t; t+1],[Pc2; Pc2], 'g--');
-hold off;
-axis tight;
-
-hax(2) = subplot(2,1,2);
-addplot([t; t+1],[L1; L1], 'LineWidth',2);
-axis tight;
-
-linkaxes(hax, 'x');
-labellines(hln,{'2','1','f_{act}/f_{res} = 0.67','right'}, 'location',[0.08 0.25 0.35, 0.8], ...
-    'rotation',0)
-print('-dpdf','test_two_muscles-1.pdf');
-
-figureseries('Effect of resonant frequency');
-xx = cat(3, freqdata.x);
-Pcall = cat(3, freqdata.Pc);
-
-subplot(1,2,1);
-imagesc(freqdata(1).t, 1./(omegarvals/(2*pi)), squeeze(xx(:,9,:))');
-ylabel('Frequency ratio f_{act}/f_{res} (Hz)');
-xlabel('Time (sec)');
-hcol = colorbar;
-ylabel(hcol, 'L');
-
-subplot(1,2,2);
-imagesc(freqdata(1).t, 1./(omegarvals/(2*pi)), squeeze(Pcall(:,1,:))' / P0);
-ylabel('Frequency ratio f_{act}/f_{res} (Hz)');
-xlabel('Time (sec)');
-hcol = colorbar;
-ylabel(hcol, 'Force ratio P_{c,1} / P_0');
-print('-dpdf','test_two_muscles-2.pdf');
-
-fxx = cat(4, freqdata.fx);
-sgn1 = sign(fxx(1,1,1,:));
-fxx(:,:,1,:) = bsxfun(@times, fxx(:,:,1,:), sgn1);
-
-fexp = cat(2,freqdata.fexp);
-
-figureseries('Floquet exponents vs resonant frequency');
-clf;
-plot(1./(omegarvals/(2*pi)), log(0.5) ./ real(fexp(1:2,:))');
-xlabel('Frequency ratio f_{act}/f_{res} (Hz)');
-ylabel('t_{1/2} (sec)');
-title('Mode one time constants');
-print('-dpdf','test_two_muscles-3.pdf');
-
-figureseries('Floquet modes vs resonant frequency');
-clf;
-hln = -1*ones(10,1);
-for i = 1:4,
-    subplot(2,2,i);
-    j = showfreq(i);
-    
-    if (isreal(fxx(:,:,1,j)))
-        hln(1:4) = plot(freqdata(j).t, fxx(:,1:4,1,j));
-        hln(5:8) = addplot(freqdata(j).t, fxx(:,5:8,1,j),'--');
-        hln(9:10) = addmplot(freqdata(j).t, fxx(:,9:10,1,j),'k-|k--','LineWidth',2);
-    else
-        plot(freqdata(j).t, real(fxx(:,:,1,j)));
-        addplot(freqdata(j).t, imag(fxx(:,:,1,j)),'--');
+    L1 = zeros(size(Pc1));
+    for i = 1:3
+        L1(:,i) = freqdata(ex(i)).x(:,Lind);
     end
-    xlabel('Time (s)');
-    title(sprintf('f_{res} = %g',omegarvals(j)/(2*pi)));
+
+    hax(1) = subplot(2,1,1);
+    hold on;
+    fill(xx(:,1:2:end),yy(:,1:2:end), [0.7 0.7 0.7], 'EdgeColor','none');
+    fill(xx(:,2:2:end),yy(:,2:2:end), 'w', 'EdgeColor','k');
+    hln = plot([t; t+1],[Pc1; Pc1],'LineWidth',2);
+    hln(end+1) = addplot([t; t+1],[Pc2; Pc2], 'g--');
+    hold off;
+    axis tight;
+
+    hax(2) = subplot(2,1,2);
+    addplot([t; t+1],[L1; L1], 'LineWidth',2);
+    axis tight;
+
+    linkaxes(hax, 'x');
+    labellines(hln,{'2','1','f_{act}/f_{res} = 0.67','right'}, 'location',[0.08 0.25 0.35, 0.8], ...
+               'rotation',0)
+    print('-dpdf','test_two_muscles-1.pdf');
+
+    figureseries('Effect of resonant frequency');
+    xx = cat(3, freqdata.x);
+    Pcall = cat(3, freqdata.Pc);
+
+    subplot(1,2,1);
+    imagesc(freqdata(1).t, 1./(omegarvals/(2*pi)), squeeze(xx(:,9,:))');
+    ylabel('Frequency ratio f_{act}/f_{res} (Hz)');
+    xlabel('Time (sec)');
+    hcol = colorbar;
+    ylabel(hcol, 'L');
+
+    subplot(1,2,2);
+    imagesc(freqdata(1).t, 1./(omegarvals/(2*pi)), squeeze(Pcall(:,1,:))' / P0);
+    ylabel('Frequency ratio f_{act}/f_{res} (Hz)');
+    xlabel('Time (sec)');
+    hcol = colorbar;
+    ylabel(hcol, 'Force ratio P_{c,1} / P_0');
+    print('-dpdf','test_two_muscles-2.pdf');
+
+    fxx = cat(4, freqdata.fx);
+    sgn1 = sign(fxx(1,1,1,:));
+    fxx(:,:,1,:) = bsxfun(@times, fxx(:,:,1,:), sgn1);
+
+    fexp = cat(2,freqdata.fexp);
+
+    figureseries('Floquet exponents vs resonant frequency');
+    clf;
+    plot(1./(omegarvals/(2*pi)), log(0.5) ./ real(fexp(1:2,:))');
+    xlabel('Frequency ratio f_{act}/f_{res} (Hz)');
+    ylabel('t_{1/2} (sec)');
+    title('Mode one time constants');
+    print('-dpdf','test_two_muscles-3.pdf');
+
+    figureseries('Floquet modes vs resonant frequency');
+    clf;
+    hln = -1*ones(10,1);
+    for i = 1:4,
+        subplot(2,2,i);
+        j = showfreq(i);
+        
+        if (isreal(fxx(:,:,1,j)))
+            hln(1:4) = plot(freqdata(j).t, fxx(:,1:4,1,j));
+            hln(5:8) = addplot(freqdata(j).t, fxx(:,5:8,1,j),'--');
+            hln(9:10) = addmplot(freqdata(j).t, fxx(:,9:10,1,j),'k-|k--','LineWidth',2);
+        else
+            plot(freqdata(j).t, real(fxx(:,:,1,j)));
+            addplot(freqdata(j).t, imag(fxx(:,:,1,j)),'--');
+        end
+        xlabel('Time (s)');
+        title(sprintf('f_{res} = %g',omegarvals(j)/(2*pi)));
+    end
+    legend(hln([1:4 9 10]),'lc','vc','Ca','Caf','L','V','Location','best');
+    print('-dpdf','test_two_muscles-4.pdf');
+
+    odeopt = odeset('RelTol',1e-6); %, 'OutputFcn', @odeoutput);
+    par.omegar = 2*pi*0.5;
+    i = find(omegarvals == par.omegar);
+    ph = 0.2;
+    j = first(freqdata(i).t >= ph);
+
+    X0 = freqdata(i).x(j,:);
+    X0 = X0 + fxx(j,:,1,i)*0.3;
+    [t,x] = ode45(@(t,x) odefcn(t,x,par), freqdata(i).t(j) + [0 2], X0, odeopt);
+
+    Pc1 = freqdata(i).Pc;
+    Pcpert(:,1) = Pc(x(:,1), x(:,2), x(:,4));
+    Pcpert(:,2) = Pc(x(:,5), x(:,6), x(:,8));
+
+    figureseries('Position perturbation');
+    hax = zeros(2,1);
+    hax(1) = subplot(2,1,1);
+    plot([freqdata(i).t; freqdata(i).t+1], [freqdata(i).x(:,9); freqdata(i).x(:,9)]-L0, 'k-', ...
+         'LineWidth',1.5);
+    addplot(t,x(:,9)-L0, 'LineWidth',2);
+
+    ylabel('L (cm)');
+    xtick labeloff;
+
+    hax(2) = subplot(2,1,2);
+    plot([freqdata(i).t; freqdata(i).t+1], [freqdata(i).Pc; freqdata(i).Pc], 'k-', ...
+         'LineWidth',1.5);
+    addmplot(t,Pcpert,'r-|r--', 'LineWidth',2);
+
+    ylabel('P_c (mN)');
+    xlabel('Time (sec)');
+    %** Print figure
+    print('-dpdf','test_two_muscles-5.pdf');
 end
-legend(hln([1:4 9 10]),'lc','vc','Ca','Caf','L','V','Location','best');
-print('-dpdf','test_two_muscles-4.pdf');
-
-odeopt = odeset('RelTol',1e-6); %, 'OutputFcn', @odeoutput);
-par.omegar = 2*pi*0.5;
-i = find(omegarvals == par.omegar);
-ph = 0.2;
-j = first(freqdata(i).t >= ph);
-
-X0 = freqdata(i).x(j,:);
-X0 = X0 + fxx(j,:,1,i)*0.3;
-[t,x] = ode45(@(t,x) odefcn(t,x,par), freqdata(i).t(j) + [0 2], X0, odeopt);
-
-Pc1 = freqdata(i).Pc;
-Pcpert(:,1) = Pc(x(:,1), x(:,2), x(:,4));
-Pcpert(:,2) = Pc(x(:,5), x(:,6), x(:,8));
-
-figureseries('Position perturbation');
-hax = zeros(2,1);
-hax(1) = subplot(2,1,1);
-plot([freqdata(i).t; freqdata(i).t+1], [freqdata(i).x(:,9); freqdata(i).x(:,9)]-L0, 'k-', ...
-    'LineWidth',1.5);
-addplot(t,x(:,9)-L0, 'LineWidth',2);
-
-ylabel('L (cm)');
-xtick labeloff;
-
-hax(2) = subplot(2,1,2);
-plot([freqdata(i).t; freqdata(i).t+1], [freqdata(i).Pc; freqdata(i).Pc], 'k-', ...
-    'LineWidth',1.5);
-addmplot(t,Pcpert,'r-|r--', 'LineWidth',2);
-
-ylabel('P_c (mN)');
-xlabel('Time (sec)');
-%** Print figure
-print('-dpdf','test_two_muscles-5.pdf');
-
 
 zetaold = par.zeta;
 omegarold = omegarvals;
@@ -294,8 +299,9 @@ if (~getvar('-file',filename,'dampdata') || (~quiet && ~inputyn('Use existing da
             
             [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x,par), 0.005, par.T, X0, ...
                 'Display','final', 'fixedperiod',true, 'initialcycles',10, 'TolX',1e-8, 'RelTol',1e-6);
-            data1.lc = data1.L(data1.t) - data1.x(:,[ls1ind ls2ind]);
-            data1.vc = data1.V(data1.t) - data1.x(:,[vs1ind vs2ind]);
+            data1.lc = par.L1 + data1.x(:,Lind)*[1 -1] - data1.x(:,[ls1ind ls2ind]);
+            data1.vc = data1.x(:,Vind)*[1 -1] - data1.x(:,[vs1ind vs2ind]);
+
             data1.Pc = Pc(data1.lc, data1.vc, data1.x(:,[Caf1ind Caf2ind]), par);
             
             data1 = get_floquet(data1,@(t,x) jfcn(t,x, par), 150);
@@ -310,76 +316,78 @@ if (~getvar('-file',filename,'dampdata') || (~quiet && ~inputyn('Use existing da
     putvar('-file',filename,'dampdata');    
 end
 
-isomega = ismember(omegarold,omegarvals);
-islowzeta = zetavals < zetaold;
+if doplot
+    isomega = ismember(omegarold,omegarvals);
+    islowzeta = zetavals < zetaold;
 
-dampdata = reshape(dampdata, [length(omegarvals) length(zetavals)]);
-dampdata = makestructarray(dampdata(:,islowzeta), freqdata(isomega), dampdata(:,~islowzeta));
-dampdata = reshape(dampdata, [length(omegarvals) length(zetavals)+1]);
-fexp = catuneven(2,dampdata.fexp);
-fexp = reshape(fexp,[size(fexp,1) length(omegarvals) length(zetavals)+1]);
+    dampdata = reshape(dampdata, [length(omegarvals) length(zetavals)]);
+    dampdata = makestructarray(dampdata(:,islowzeta), freqdata(isomega), dampdata(:,~islowzeta));
+    dampdata = reshape(dampdata, [length(omegarvals) length(zetavals)+1]);
+    fexp = catuneven(2,dampdata.fexp);
+    fexp = reshape(fexp,[size(fexp,1) length(omegarvals) length(zetavals)+1]);
 
-for i = 1:2
-    switch i
-        case 1
+    for i = 1:2
+        switch i
+          case 1
             figureseries('Damping and resonance, mode 1');
-        case 2
+          case 2
             figureseries('Damping and resonance, mode 2');
-    end            
+        end            
+        clf;
+        hax(i) = gca;
+        plot(1./(omegarvals/(2*pi)), log(0.5) ./ real(squeeze(fexp(i,:,:))));
+        xlabel('Frequency ratio f_{act}/f_{res} (Hz)');
+        ylabel('t_{1/2} (sec)');
+        title(sprintf('Mode %d time constants',i));
+    end
+
+    zetavalall = [zetavals(islowzeta) zetaold zetavals(~islowzeta)];
+    lab = cell(size(zetavalall));
+    for i = 1:length(zetavalall),
+        lab{i} = sprintf('%g',zetavalall(i));
+    end
+    labellines(hax(1), lab,'location',-0.2);
+    %** Print figure
+    print('-dpdf','test_two_muscles-6.pdf');
+
+
+    figureseries('Damping and floquet modes');
     clf;
-    hax(i) = gca;
-    plot(1./(omegarvals/(2*pi)), log(0.5) ./ real(squeeze(fexp(i,:,:))));
-    xlabel('Frequency ratio f_{act}/f_{res} (Hz)');
-    ylabel('t_{1/2} (sec)');
-    title(sprintf('Mode %d time constants',i));
-end
 
-zetavalall = [zetavals(islowzeta) zetaold zetavals(~islowzeta)];
-lab = cell(size(zetavalall));
-for i = 1:length(zetavalall),
-    lab{i} = sprintf('%g',zetavalall(i));
-end
-labellines(hax(1), lab,'location',-0.2);
-%** Print figure
-print('-dpdf','test_two_muscles-6.pdf');
+    showdamp = [1 1; length(omegarvals) 1; 1 length(zetavalall); length(omegarvals) length(zetavalall)];
+    for k = 1:4
+        subplot(2,2,k);
+        i = showdamp(k,1);
+        j = showdamp(k,2);
+        
+        hln = zeros(6,1);
+        hln(1:4) = plot(dampdata(i,j).t, dampdata(i,j).fx(:,1:4,1));
+        addplot(dampdata(i,j).t, dampdata(i,j).fx(:,5:8,1),'--');
+        hln(5:6) = addmplot(dampdata(i,j).t, dampdata(i,j).fx(:,9:10,1), 'k-|k--', 'LineWidth',2);
+        xlabel('Time (sec)');
+        
+        title(sprintf('f_{act}/f_{res} = %g, \\zeta = %g, t_{1/2} = %g', ...
+                      1./(omegarvals(i)/(2*pi)), zetavalall(j), log(0.5) ./ real(fexp(1,i,j))));
+    end
+    labellines(hln, {'lc','vc','Ca','Caf','L','V'});
+    %** Print figure
+    print('-dpdf','test_two_muscles-7.pdf');
 
+    figureseries('Effect of the mode');
+    clf;
 
-figureseries('Damping and floquet modes');
-clf;
-
-showdamp = [1 1; length(omegarvals) 1; 1 length(zetavalall); length(omegarvals) length(zetavalall)];
-for k = 1:4
-    subplot(2,2,k);
-    i = showdamp(k,1);
-    j = showdamp(k,2);
-    
-    hln = zeros(6,1);
-    hln(1:4) = plot(dampdata(i,j).t, dampdata(i,j).fx(:,1:4,1));
+    i = 1;
+    j = length(zetavalall);
+    plot(dampdata(i,j).t, dampdata(i,j).fx(:,1:4,1));
     addplot(dampdata(i,j).t, dampdata(i,j).fx(:,5:8,1),'--');
-    hln(5:6) = addmplot(dampdata(i,j).t, dampdata(i,j).fx(:,9:10,1), 'k-|k--', 'LineWidth',2);
+    addmplot(dampdata(i,j).t, dampdata(i,j).fx(:,9:10,1), 'k-|k--', 'LineWidth',2);
     xlabel('Time (sec)');
-    
-    title(sprintf('f_{act}/f_{res} = %g, \\zeta = %g, t_{1/2} = %g', ...
-        1./(omegarvals(i)/(2*pi)), zetavalall(j), log(0.5) ./ real(fexp(1,i,j))));
+    ylabel('Deviation');
+
+    labellines(hln, {'lc1','vc1','Ca1','Caf1','lc2','vc2','Ca2','Caf2','L','V'});
+    %** Print figure
+    print('-dpdf','test_two_muscles-8.pdf');
 end
-labellines(hln, {'lc','vc','Ca','Caf','L','V'});
-%** Print figure
-print('-dpdf','test_two_muscles-7.pdf');
-
-figureseries('Effect of the mode');
-clf;
-
-i = 1;
-j = length(zetavalall);
-plot(dampdata(i,j).t, dampdata(i,j).fx(:,1:4,1));
-addplot(dampdata(i,j).t, dampdata(i,j).fx(:,5:8,1),'--');
-addmplot(dampdata(i,j).t, dampdata(i,j).fx(:,9:10,1), 'k-|k--', 'LineWidth',2);
-xlabel('Time (sec)');
-ylabel('Deviation');
-
-labellines(hln, {'lc1','vc1','Ca1','Caf1','lc2','vc2','Ca2','Caf2','L','V'});
-%** Print figure
-print('-dpdf','test_two_muscles-8.pdf');
 
 zetaoldvals = zetavals;
 omegaroldvals = omegarvals;
@@ -405,12 +413,13 @@ if (~getvar('-file',filename,'dutydata') || (~quiet && ~inputyn('Use existing da
             par.zeta = zetavals(j);
             for i = 1:length(omegarvals)
                 par.omegar = omegarvals(i);
-                fprintf('Duty = %g, Zeta = %g, OmegaR = %g\n', duty, zeta, omegar);
+                fprintf('Duty = %g, Zeta = %g, OmegaR = %g\n', par.duty, par.zeta, par.omegar);
 
                 [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x,par), 0.005, par.T, X0, ...
                     'Display','final', 'fixedperiod',true, 'initialcycles',10, 'TolX',1e-8, 'RelTol',1e-6);
-                data1.lc = data1.L(data1.t) - data1.x(:,[ls1ind ls2ind]);
-                data1.vc = data1.V(data1.t) - data1.x(:,[vs1ind vs2ind]);
+                data1.lc = par.L1 + data1.x(:,Lind)*[1 -1] - data1.x(:,[ls1ind ls2ind]);
+                data1.vc = data1.x(:,Vind)*[1 -1] - data1.x(:,[vs1ind vs2ind]);
+
                 data1.Pc = Pc(data1.lc, data1.vc, data1.x(:,[Caf1ind Caf2ind]), par);
 
                 data1 = get_floquet(data1,@(t,x) jfcn(t,x, par), 150);
@@ -428,49 +437,51 @@ if (~getvar('-file',filename,'dutydata') || (~quiet && ~inputyn('Use existing da
     putvar('-file',filename, 'dutydata');
 end
 
-isomega = ismember(omegaroldvals,omegarvals);
-iszeta = ismember(zetaoldvals,zetavals);
-islowduty = dutycyclevals < dutycycleold;
+if doplot
+    isomega = ismember(omegaroldvals,omegarvals);
+    iszeta = ismember(zetaoldvals,zetavals);
+    islowduty = dutycyclevals < dutycycleold;
 
-dutydata = reshape(dutydata, [length(omegarvals) length(zetavals) length(dutycyclevals)]);
-dutydata = makestructarray(dutydata(:,:,islowduty), dampdata(isomega,iszeta), dutydata(:,:,~islowduty));
-dutydata = reshape(dutydata, [length(omegarvals) length(zetavals) length(dutycyclevals)+1]);
+    dutydata = reshape(dutydata, [length(omegarvals) length(zetavals) length(dutycyclevals)]);
+    dutydata = makestructarray(dutydata(:,:,islowduty), dampdata(isomega,iszeta), dutydata(:,:,~islowduty));
+    dutydata = reshape(dutydata, [length(omegarvals) length(zetavals) length(dutycyclevals)+1]);
 
-dutyall = [dutycyclevals(islowduty) dutycycleold dutycyclevals(~islowduty)];
+    dutyall = [dutycyclevals(islowduty) dutycycleold dutycyclevals(~islowduty)];
 
-figureseries('Force length vs duty cycle');
-xx = cat(3, dutydata.x);
-Lall = squeeze(xx(:,9,:));
-Lall = reshape(Lall,[size(Lall,1) 4 4]);
+    figureseries('Force length vs duty cycle');
+    xx = cat(3, dutydata.x);
+    Lall = squeeze(xx(:,9,:));
+    Lall = reshape(Lall,[size(Lall,1) 4 4]);
 
-Pcall = cat(3, dutydata.Pc);
-Pcall = squeeze(Pcall(:,1,:));
-Pcall = reshape(Pcall,[size(Pcall,1) 4 4]);
+    Pcall = cat(3, dutydata.Pc);
+    Pcall = squeeze(Pcall(:,1,:));
+    Pcall = reshape(Pcall,[size(Pcall,1) 4 4]);
 
-for i = 1:4,
-    hax(1) = subplot(2,2,i);
-    mplot(Lall(:,:,i), Pcall(:,:,i), 'b-|g--|r-|c--','LineWidth',2);
-end
-%** Print figure
-print('-dpdf','test_two_muscles-9.pdf');
+    for i = 1:4,
+        hax(1) = subplot(2,2,i);
+        mplot(Lall(:,:,i), Pcall(:,:,i), 'b-|g--|r-|c--','LineWidth',2);
+    end
+    %** Print figure
+    print('-dpdf','test_two_muscles-9.pdf');
 
     
-fexp = catuneven(2,dutydata.fexp);
-fexp = reshape(fexp,[size(fexp,1) length(omegarvals) length(zetavals) length(dutyall)]);
+    fexp = catuneven(2,dutydata.fexp);
+    fexp = reshape(fexp,[size(fexp,1) length(omegarvals) length(zetavals) length(dutyall)]);
 
-figureseries('Floquet exponents vs duty cycle');
-lab = {'0.2, 3', '0.2, 0.5', '4, 3', '4, 0.5'};
-clf;
-for i = 1:2
-    hax(i) = subplot(2,1,i);
-    plot(dutyall, log(0.5) ./ real(flatten(fexp(i,:,:,:),1:3)), 'o-');
-    xlabel('Duty cycle');
-    ylabel('t_{1/2} (sec)');
-    title(sprintf('Mode %d time constants',i));
-    legend(lab, 'Location','NE');
+    figureseries('Floquet exponents vs duty cycle');
+    lab = {'0.2, 3', '0.2, 0.5', '4, 3', '4, 0.5'};
+    clf;
+    for i = 1:2
+        hax(i) = subplot(2,1,i);
+        plot(dutyall, log(0.5) ./ real(flatten(fexp(i,:,:,:),1:3)), 'o-');
+        xlabel('Duty cycle');
+        ylabel('t_{1/2} (sec)');
+        title(sprintf('Mode %d time constants',i));
+        legend(lab, 'Location','NE');
+    end
+    %** Print figure
+    print('-dpdf','test_two_muscles-10.pdf');
 end
-%** Print figure
-print('-dpdf','test_two_muscles-10.pdf');
 
 vals = fullfact([2 2 2 1]);
 islen = vals(:,1) == 2;
@@ -526,12 +537,12 @@ if (~getvar('-file',filename,'nonlindata') || (~quiet && ~inputyn('Use existing 
                         par.mu1 = par0.mu1;
                 end
                 
-                fprintf('Duty = %g, OmegaR = %g, Nonlin = %d\n', duty, omegar, i);
+                fprintf('Duty = %g, OmegaR = %g, Nonlin = %d\n', par.duty, par.omegar, i);
 
                 [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x,par), 0.005, par.T, X0, ...
                     'Display','final', 'fixedperiod',true, 'initialcycles',10, 'TolX',1e-8, 'RelTol',1e-6);
-                data1.lc = data1.L(data1.t) - data1.x(:,[ls1ind ls2ind]);
-                data1.vc = data1.V(data1.t) - data1.x(:,[vs1ind vs2ind]);
+                data1.lc = par.L1 + data1.x(:,Lind)*[1 -1] - data1.x(:,[ls1ind ls2ind]);
+                data1.vc = data1.x(:,Vind)*[1 -1] - data1.x(:,[vs1ind vs2ind]);
                 data1.Pc = Pc(data1.lc, data1.vc, data1.x(:,[Caf1ind Caf2ind]), par);
 
                 data1 = get_floquet(data1,@(t,x) jfcn(t,x,par), 150);
@@ -555,64 +566,66 @@ if (~getvar('-file',filename,'nonlindata') || (~quiet && ~inputyn('Use existing 
     putvar nonlindata;
 end
 
-nonlindata = reshape(nonlindata, [4 length(omegarvals) length(dutycyclevals)]);
+if doplot
+    nonlindata = reshape(nonlindata, [5 length(omegarvals) length(dutycyclevals)]);
 
-Pcall = cat(3, nonlindata.Pc);
-Pcall = reshape(Pcall,[size(Pcall,1) 2 4 3 4]);
+    Pcall = cat(3, nonlindata.Pc);
+    Pcall = reshape(Pcall,[size(Pcall,1) 2 4 3 4]);
 
-xx = cat(3, nonlindata.x);
-xx = reshape(xx, [size(xx,1) size(xx,2) size(nonlindata)]);
-tt = nonlindata(1).t;
+    xx = cat(3, nonlindata.x);
+    xx = reshape(xx, [size(xx,1) size(xx,2) size(nonlindata)]);
+    tt = nonlindata(1).t;
 
-fexp = catuneven(2,nonlindata.fexp);
-fexp = reshape(fexp,[size(fexp,1) size(nonlindata)]);
+    fexp = catuneven(2,nonlindata.fexp);
+    fexp = reshape(fexp,[size(fexp,1) size(nonlindata)]);
 
-figureseries('Floquet exponents vs nonlinearity');
-lab = {'flat','FL','FV','FLV'};
-clf;
-for i = 1:2
-    hax(i) = subplot(2,1,i);
-    plot(dutycyclevals, log(0.5) ./ real(flatten(fexp(i,:,2,:),1:3)), 'o-');
-    xlabel('Duty cycle');
-    ylabel('t_{1/2} (sec)');
-    title(sprintf('Mode %d time constants',i));
-    legend(lab, 'Location','NE');
-end
-%** Print figure
-print('-dpdf','test_two_muscles-11.pdf');
+    figureseries('Floquet exponents vs nonlinearity');
+    lab = {'flat','FL','FV','FLV'};
+    clf;
+    for i = 1:2
+        hax(i) = subplot(2,1,i);
+        plot(dutycyclevals, log(0.5) ./ real(flatten(fexp(i,:,2,:),1:3)), 'o-');
+        xlabel('Duty cycle');
+        ylabel('t_{1/2} (sec)');
+        title(sprintf('Mode %d time constants',i));
+        legend(lab, 'Location','NE');
+    end
+    %** Print figure
+    print('-dpdf','test_two_muscles-11.pdf');
 
-figureseries('Limit cycle vs nonlinearity');
-clf;
-subplot(2,1,1);
-plot(tt,squeeze(Pcall(:,1,:,2,2)));
-addplot(tt,squeeze(Pcall(:,2,:,2,2)),'--');
+    figureseries('Limit cycle vs nonlinearity');
+    clf;
+    subplot(2,1,1);
+    plot(tt,squeeze(Pcall(:,1,:,2,2)));
+    addplot(tt,squeeze(Pcall(:,2,:,2,2)),'--');
 
-subplot(2,1,2);
-plot(tt,squeeze(xx(:,9,:,2,2)));
-%** Print figure
-print('-dpdf','test_two_muscles-12.pdf');
+    subplot(2,1,2);
+    plot(tt,squeeze(xx(:,9,:,2,2)));
+    %** Print figure
+    print('-dpdf','test_two_muscles-12.pdf');
     
-figureseries('Limit cycle vs duty cycle');
-clf;
-subplot(2,1,1);
-plot(tt,squeeze(Pcall(:,1,4,2,:)));
+    figureseries('Limit cycle vs duty cycle');
+    clf;
+    subplot(2,1,1);
+    plot(tt,squeeze(Pcall(:,1,4,2,:)));
 
-subplot(2,1,2);
-plot(tt,squeeze(xx(:,9,4,2,:)));
-%** Print figure
-print('-dpdf','test_two_muscles-13.pdf');
+    subplot(2,1,2);
+    plot(tt,squeeze(xx(:,9,4,2,:)));
+    %** Print figure
+    print('-dpdf','test_two_muscles-13.pdf');
 
-figureseries('Floquet exponents vs duty cycle2');
-clf;
-for i = 1:2
-    hax(i) = subplot(2,1,i);
-    plot(dutycyclevals, log(0.5) ./ real(flatten(fexp(i,4,:,:),1:3)), 'o-');
-    xlabel('Duty cycle');
-    ylabel('t_{1/2} (sec)');
-    title(sprintf('Mode %d time constants',i));
+    figureseries('Floquet exponents vs duty cycle2');
+    clf;
+    for i = 1:2
+        hax(i) = subplot(2,1,i);
+        plot(dutycyclevals, log(0.5) ./ real(flatten(fexp(i,4,:,:),1:3)), 'o-');
+        xlabel('Duty cycle');
+        ylabel('t_{1/2} (sec)');
+        title(sprintf('Mode %d time constants',i));
+    end
+    %** Print figure
+    print('-dpdf','test_two_muscles-14.pdf');
 end
-%** Print figure
-print('-dpdf','test_two_muscles-14.pdf');
 
 
 
