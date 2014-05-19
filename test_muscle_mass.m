@@ -5,7 +5,7 @@ function test_muscle_mass
 
 filename = 'test_muscle_mass.mat';
 quiet = true;
-doplot = true;
+doplot = false;
 
 par.L0 = 2.94;                  % mm
 par.Lis = 2.7;                  % mm
@@ -164,7 +164,7 @@ if doplot
     title('Mode one time constants');
     print('-dpdf','test_muscle_mass-2.pdf');
 
-    figure('Modes vs res freq');
+    figureseries('Modes vs res freq');
     clf;
     for i = 1:4,
         subplot(2,2,i);
@@ -192,7 +192,8 @@ omegarvals = 2*pi* ([0.3 0.5 0.8 1 1.2 1.5 2]);
 if (~getvar('-file',filename,'dampdata') || (~quiet && ~inputyn('Use existing damping data?', 'default',true)))
     dampdata = struct([]);
     
-    X0 = [L0 - ls0   0   0   0    L0   0];
+    X0 = [0   0   0   0    1    ...
+          0   0];
     
     a = 1;
     n = length(omegarvals) * length(zetavals);
