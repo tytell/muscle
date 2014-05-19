@@ -3,9 +3,9 @@ function test_two_muscles
 %optimized parameters:
 %2: m = 0.0542; b = 0.2802; lc0 = 0.9678; k1 = 6.7281; k2 = 23.2794; k30 = 51.3537; k40 = 19.3801; km1 = 17.5804; km2 = 6.0156    ->> sum(dx^2) = 6.056118
 
-filename = '~etytel01/Matlab/muscle/test_two_muscles.mat';
+filename = 'test_two_muscles.mat';
 quiet = true;
-doplot = false;
+doplot = true;
 
 par.L0 = 2.94;                  % mm
 par.Lis = 2.7;                  % mm
@@ -149,7 +149,7 @@ if doplot
     figureseries('Time series res freq');
     clf;
     xx = [0 par.duty par.duty 0; 0.5 par.duty+0.5 par.duty+0.5 0.5]';
-    yy = [0 0 30 30; 0 0 30 30]';
+    yy = [0 0 1 1; 0 0 1 1]';
 
     xx = repmat(xx,[1 2]);
     xx(:,1:2:end) = xx(:,1:2:end) + repmat(0:1,[4 1]);
@@ -197,7 +197,7 @@ if doplot
     ylabel(hcol, 'L');
 
     subplot(1,2,2);
-    imagesc(freqdata(1).t, 1./(omegarvals/(2*pi)), squeeze(Pcall(:,1,:))' / P0);
+    imagesc(freqdata(1).t, 1./(omegarvals/(2*pi)), squeeze(Pcall(:,1,:))');
     ylabel('Frequency ratio f_{act}/f_{res} (Hz)');
     xlabel('Time (sec)');
     hcol = colorbar;
