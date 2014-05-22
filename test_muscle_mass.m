@@ -4,8 +4,9 @@ function test_muscle_mass
 %2: m = 0.0542; b = 0.2802; lc0 = 0.9678; k1 = 6.7281; k2 = 23.2794; k30 = 51.3537; k40 = 19.3801; km1 = 17.5804; km2 = 6.0156    ->> sum(dx^2) = 6.056118
 
 filename = 'test_muscle_mass.mat';
+
 quiet = true;
-doplot = false;
+doplot = true;
 
 par.L0 = 2.94;                  % mm
 par.Lis = 2.7;                  % mm
@@ -248,289 +249,209 @@ if doplot
     print('-dpdf','test_muscle_mass-4.pdf');    
 end
 
-% 
-% figure(3);
-% clf;
-% for i = 1:4,
-%     subplot(2,2,i);
-%     j = showphi(i);
-%     h1 = plot(data(j).t, data(j).x, 'k--');
-%     h2 = addplot(data(j).t, data(j).x + 0.1*fxx(:,:,1,j));
-%     xlabel('Time (s)');
-%     title(sprintf('\\phi_{act} = %g',phitest(j)));
-% end
-% legend([h1(1); h2], 'steady','lc','vc','Ca','Caf','Location','best');
-% 
-% figure(4);
-% clf;
-% Pcdevall = zeros(length(t),length(phitest),length(phitest));
-% W0 = zeros(length(phitest),1);
-% Wdev = zeros(length(phitest),length(phitest));
-% for i = 1:length(data)
-%     xbase = data(i).x;
-%     Pcbase = data(i).Pc;
-%     
-%     %W0(i) = trapz(-data(i).L(t), Pcbase);
-%     % plot(-data(i).L(t), Pcbase, 'k-');
-%     % fprintf('Total work at phase %g = %g\n', phitest(i), W0(i));
-%     
-%     dec = exp(data(i).fexp(1)*data(i).t);
-%     for j = 1:length(phitest),
-%         a = find(t >= phitest(j),1);
-%         k = [a:length(t) 1:a-1]';
-%         dec1 = zeros(size(dec));
-%         dec1(k) = dec;
-%         
-%         dev1 = fxx(:,:,1);
-%         %dev1 = dev1 / sqrt(sum(dev1(1,:).^2));
-%         dev1 = bsxfun(@times, dev1, dec1);
-%         
-%         xfx1 = xbase + 0.2*dev1;
-%         Pcdevall(:,i,j) = Pc(xfx1(:,1),xfx1(:,2),xfx1(:,4));
-%         
-%         %Wdev(i,j) = trapz(-data(i).L(t), Pcdevall(:,i,j));
-%         %addplot(-data(i).L(t), Pcdevall(:,i,j), 'r-');
-%         %drawnow;
-%     end
-%     %pause;
-% end
-% 
-% figure(4);
-% clf;
-% showphi = [0.1 0.5 0.7];
-% ishowphi = zeros(size(showphi));
-% for i = 1:length(showphi)
-%     j  = find(phitest >= showphi(i), 1);
-%     ishowphi(i) = j;
-% end
-% plot(phitest, W0, phitest, Wdev(:,ishowphi));
-% xlabel('Activation phase');
-% ylabel('Work');
-% legend('steady','perturbed','Location','best');
-% 
-% figure(5);
-% clf;
-% contourf(phitest, phitest, bsxfun(@minus, Wdev, W0)' / max(abs(W0)));
-% hcol = colorbar;
-% 
-% xlabel('Phase of activation');
-% ylabel('Phase of perturbation');
-% 
-% ylabel(hcol, 'Fractional change');
-% 
-% 
-% L0test = lc0 + ls0 + [-2*A 0 2*A];
-% phitest2 = 0:0.2:0.8;
-% if (~getvar('L0data') || ~inputyn('Use existing data?', 'default',true))
-%     L0data = struct([]);
-%     for i = 1:length(phitest2)
-%         phi = phitest2(i);
-%         for j = 1:length(L0test)
-%             L0 = L0test(j);
-% 
-%             % L = @(t) L0 + A * cos(2*pi/T * (t - phi));
-%             X0 = [L0 - ls0   0   0   0   L0  0];
-% 
-%             [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x), 0.005, T, X0, ...
-%                 'Display','iter-detailed', 'fixedperiod',true, 'initialcycles',2, 'TolX',1e-8, 'RelTol',1e-6);
-%             data1.Pc = Pc(data1.x(:,1), data1.x(:,2), data1.x(:,4));
-% 
-%             data1 = get_floquet(data1,@(t,x) jfcn(t,x), 100, 'neigenvalues',4);
-%             L0data = makestructarray(L0data,data1);
-%         end
-%     end
-%     L0data = reshape(L0data,[length(L0test) length(phitest2)]);
-%     putvar L0data;
-%     
-%     %reset L0
-%     L0 = 2.7;
-% end
-% 
-% lcall = cat(3,L0data.x);
-% lcall = squeeze(lcall(:,1,:));
-% lcall = reshape(lcall, [size(lcall,1) size(L0data)]);
-% 
-% figure(6);
-% clf;
-% subplot(2,2,1);
-% lc1 = 0.7*lc0:0.01:1.3*lc0;
-% plot(lc1, lambdafcn(lc1), 'k--');
-% addplot(squeeze(lcall(:,1,:)), squeeze(lambdafcn(lcall(:,1,:))),'b-', ...
-%     squeeze(lcall(:,2,:)), squeeze(lambdafcn(lcall(:,2,:))),'g-', ...
-%     squeeze(lcall(:,3,:)), squeeze(lambdafcn(lcall(:,3,:))),'r-', ...
-%     'LineWidth',2);
-% axis tight;
-% xlabel('lc');
-% ylabel('\lambda');
-% 
-% subplot(2,2,2);
-% plot(t, squeeze(lcall(:,1,:)),'b-', ...
-%     t, squeeze(lcall(:,2,:)),'g-', ...
-%     t, squeeze(lcall(:,3,:)),'r-');
-% xlabel('Time (s)');
-% ylabel('lc');
-% 
-% subplot(2,1,2);
-% fx = cat(3,L0data.fexp);
-% fx = reshape(fx,[4 size(L0data)]);
-% plot(phitest2,squeeze(fx(1,:,:)),'o-');
-% xlabel('Activation phase');
-% ylabel('Mode 1 exponent');
-% 
-% if (~getvar('NLdata') || ~inputyn('Use existing data?', 'default',true))
-%     NLdata = struct([]);
-%     for i = 1:2
-%         switch i
-%             case 1
-%                 lambda2 = -2.23;
-%             case 2
-%                 lambda2 = 0;
-%         end
-%         for j = 1:2
-%             switch j
-%                 case 1
-%                     xm = 0.4;
-%                     xp = 1.33;
-%                 case 2
-%                     xm = 0;
-%                     xp = 0;
-%             end
-% 
-%             for k = 1:length(phitest2)
-%                 phi = phitest2(k);
-%                 
-%                 %L = @(t) L0 + A * cos(2*pi/T * (t - phi));
-%                 X0 = [L0 - ls0   0   0   0   L0  0];
-% 
-%                 [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x), 0.005, T, X0, ...
-%                     'Display','iter-detailed', 'fixedperiod',true, 'initialcycles',2, 'TolX',1e-8, 'RelTol',1e-6);
-%                 data1.Pc = Pc(data1.x(:,1), data1.x(:,2), data1.x(:,4));
-% 
-%                 data1 = get_floquet(data1,@(t,x) jfcn(t,x), 100, 'neigenvalues',4);
-% 
-%                 NLdata = makestructarray(NLdata,data1);
-%             end
-%         end
-%     end
-%     NLdata = reshape(NLdata,[length(phitest2) 2 2]);
-%     putvar NLdata;
-% 
-% 
-%     lambda2 = -2.23;
-%     xm = 0.4;
-%     xp = 1.33;
-% end
-% 
-% Pcnl = cat(2,NLdata.Pc);
-% Pcnl = reshape(Pcnl, [size(Pcnl,1) size(NLdata)]);
-% 
-% figure(7);
-% clf;
-% for i = 1:5,
-%     subplot(2,3,i);
-%     plot(t, flatten(Pcnl(:,i,:,:),2:4));
-%     xlabel('Time (s)');
-%     ylabel('Force (mN)');
-%     
-%     if (i == 3)
-%         legend('normal','fv=0','fl=0','both', 'location','best');
-%     end
-% end
-% 
-% 
-% subplot(2,3,6);
-% fx = cat(3,NLdata.fexp);
-% fx = reshape(fx,[4 size(NLdata)]);
-% plot(phitest2,squeeze(fx(1,:,:)),'o-');
-% xlabel('Activation phase');
-% ylabel('Mode 1 exponent');
-% 
-% Btest = [5 10 15 20];
-% if (~getvar('Bdata') || ~inputyn('Use existing B data?', 'default',true))
-%     Bdata = struct([]);
-%     for i = 1:length(phitest2)
-%         phi = phitest2(i);
-%         for j = 1:length(Btest)
-%             B = Btest(j);
-%             
-%             %L = @(t) L0 + A * cos(2*pi/T * (t - phi));
-%             X0 = [L0 - ls0   0   0   0   L0   0];
-% 
-%             [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x), 0.005, T, X0, ...
-%                 'Display','iter-detailed', 'fixedperiod',true, 'initialcycles',2, 'TolX',1e-8, 'RelTol',1e-6);
-%             data1.Pc = Pc(data1.x(:,1), data1.x(:,2), data1.x(:,4));
-% 
-%             data1 = get_floquet(data1,@(t,x) jfcn(t,x), 100, 'neigenvalues',4);
-%             data1.B = B;
-%             Bdata = makestructarray(Bdata,data1);
-%         end
-%     end
-%     Bdata = reshape(Bdata,[length(Btest) length(phitest2)]);
-%     putvar Bdata;
-%     
-%     B = 10;
-% end
-% 
-% figure(8);
-% fx = cat(3,Bdata.fexp);
-% fx = reshape(fx,[4 size(Bdata)]);
-% plot(Btest,log(0.5) ./ real(squeeze(fx(1,:,:))),'o-');
-% 
-% xlabel('Damping coefficient');
-% ylabel('t_{1/2} (sec)');
-% title('Mode one time constant vs damping');
-% 
-% k3test = 0.6:0.1:1.4;
-% k4test = [0.8 1 1.2];
-% if (~getvar('k34data') || ~inputyn('Use existing k3 k4 data?', 'default',true))
-%     phi = 0;
-%     k30 = k3;
-%     k40 = k4;
-%     
-%     %L = @(t) L0 + A * cos(2*pi/T * (t - phi));
-%     X0 = [L0 - ls0   0   0   0   L0   0];
-%     
-%     k34data = struct([]);
-%     for i = 1:length(k3test)
-%         k3 = k30*k3test(i);
-%         for j = 1:length(k4test)
-%             k4 = k40*k4test(j);
-%             
-%             [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x), 0.005, T, X0, ...
-%                 'Display','iter-detailed', 'fixedperiod',true, 'initialcycles',2, 'TolX',1e-8, 'RelTol',1e-6);
-%             data1.Pc = Pc(data1.x(:,1), data1.x(:,2), data1.x(:,4));
-% 
-%             data1 = get_floquet(data1,@(t,x) jfcn(t,x), 100, 'neigenvalues',4);
-%             data1.k3 = k3;
-%             data1.k4 = k4;
-%             k34data = makestructarray(k34data,data1);
-%         end
-%     end
-%     k34data = reshape(k34data,[length(k4test) length(k3test)]);
-%     putvar k34data;
-%     
-%     k3 = k30;
-%     k4 = k40;
-% end
-% 
-% figure(9);
-% fx = cat(3,k34data.fexp);
-% fx = reshape(fx,[4 size(k34data)]);
-% plot(k3test*k3,log(0.5) ./ real(squeeze(fx(1,:,:))),'o-');
-% 
-% lab = cell(size(k4test));
-% for i = 1:length(k4test)
-%     lab{i} = sprintf('%.2g',k4test(i)*k4);
-%     if (i == 1)
-%         lab{i} = ['k4 = ' lab{i}];
-%     end
-% end
-% labellines(lab ,'rotation',0);
-% 
-% xlabel('k3');
-% ylabel('t_{1/2} (sec)');
-% title('Mode one time constant vs k3 and k4');
-% 
+zetavals = [0.2 1 2];
+omegarvals = 2*pi* ([0.5 0.8 1 1.2 1.5 2]);
+dutyvals = [0.1 0.36 0.5 0.6];
+if (~getvar('-file',filename,'dutydata') || (~quiet && ~inputyn('Use existing duty cycle data?', 'default',true)))
+    dutydata = struct([]);
+    
+    X0 = [0   0   0   0    1    ...
+          0   0];
+    
+    a = 1;
+    n = length(omegarvals) * length(zetavals) * length(dutyvals);
+    progress(0,n,'**** Duty cycle tests');
+    for k = 1:length(dutyvals)
+        par.duty = dutyvals(k);
+        for j = 1:length(zetavals)
+            par.zeta = zetavals(j);
+            for i = 1:length(omegarvals)
+                par.omegar = omegarvals(i);
+
+                par.act = @(t) mod(t,par.T) < par.duty;
+
+                [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x,par), 0.005, par.T, X0, ...
+                    'Display','final', 'fixedperiod',true, 'initialcycles',10, 'TolX',1e-8, 'RelTol',1e-6);
+                data1.lc = par.L1 + data1.x(:,Lind) - data1.x(:,ls1ind);
+                data1.vc = data1.x(:,Vind) - data1.x(:,vs1ind);
+
+                data1.Pc = Pc(data1.lc, data1.vc, data1.x(:,Caf1ind), par);
+
+                data1 = get_floquet(data1,@(t,x) jfcn(t,x,par), 150);
+                data1.zeta = par.zeta;
+                data1.omegar = par.omegar;
+                data1.duty = par.duty;
+                dutydata = makestructarray(dutydata,data1);
+                a = a+1;
+
+                progress(a);
+            end
+        end
+    end
+    putvar('-file',filename,'dutydata');
+end
+
+vals = fullfact([2 2 2 3]);
+islen = vals(:,1) == 2;
+isvel = vals(:,2) == 2;
+iswork = vals(:,3) == 2;
+stiffval = vals(:,4);
+dutyvals = [0.1 0.36 0.6];
+N = length(islen) * length(dutyvals);
+
+if (~getvar('-file',filename,'NLdata') || (~quiet && ~inputyn('Use existing data?', 'default',true)))
+    par0 = par;
+    
+    progress(0,N, '**** Nonlinear calculations');
+    NLdata = struct([]);
+    n = 0;
+    for i = 1:length(islen)
+        if (islen(i))
+            par.lambda2 = par0.lambda2;
+        else
+            par.lambda2 = 0;
+        end
+        if (isvel(i))
+            par.alpham = par0.alpham;
+            par.alphap = par0.alphap;
+        else
+            par.alpham = 0;
+            par.alphap = 0;
+        end
+        if (iswork(i))
+            par.km1 = par0.km1;
+        else
+            par.km1 = 0;
+        end
+        switch stiffval(i)
+          case 1
+            par.mu0 = par0.mu0 + par0.mu1;
+            par.mu1 = 0;
+          case 2
+            par.mu0 = par0.mu0;
+            par.mu1 = 0;
+          case 3
+            par.mu0 = par0.mu0;
+            par.mu1 = par0.mu1;
+        end
+        
+        for k = 1:length(dutyvals)
+            X0 = [0   0   0   0    1    ...
+                0   0];
+
+            par.act = @(t) mod(t,par.T) < par.duty;
+            
+            [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x, par), 0.005, par.T, X0, ...
+                'Display','iter-detailed', 'fixedperiod',true, 'initialcycles',2, 'TolX',1e-8, 'RelTol',1e-6);
+
+            data1.lc = par.L(data1.t) - data1.x(:,1);
+            data1.vc = par.V(data1.t) - data1.x(:,2);
+            data1.Pc = Pc(data1.lc, data1.vc, data1.x(:,4), par);
+
+            data1 = get_floquet(data1,@(t,x) jfcn(t,x, par), 100);
+            data1.L = par.L;
+            data1.islen = islen(i);
+            data1.isvel = isvel(i);
+            data1.iswork = iswork(i);
+            data1.stiffval = stiffval(i);
+
+            NLdata = makestructarray(NLdata,data1);
+            n = n+1;
+            progress(n);
+        end
+    end
+
+    putvar('-file',filename,'NLdata');
+    par = par0;
+end
+
+if doplot
+    figureseries('Floquet exp vs nonlin');
+    clf;
+    subplot(2,3,6);
+    fx = cat(3,NLdata.fexp);
+    fx = reshape(fx,[5 size(NLdata)]);
+
+    clf;
+    yl = [Inf -Inf];
+    hax = zeros(4,1);
+    for i = 1:4,
+        switch i
+            case 1
+                good = ~islen & ~isvel;
+                ttl = 'fl=0, fv=0';
+            case 2
+                good = islen & ~isvel;
+                ttl = 'fv=0';
+            case 3
+                good = ~islen & isvel;
+                ttl = 'fl=0';
+            case 4
+                good = islen & isvel;
+                ttl = 'all';
+        end
+        hax(i) = subplot(2,2,i);
+        plot(phitest2, squeeze(real(fx(1,:,good))));
+        xlabel('Activation phase');
+        ylabel('Mode 1 exponent');
+        title(ttl);
+        if (i == 1)
+            legend('none','stiff=const','work=0','both');
+        end
+        yl1 = ylim;
+        if (yl1(1) < yl(1))
+            yl(1) = yl1(1);
+        end
+        if (yl1(2) > yl(2))
+            yl(2) = yl1(2);
+        end
+    end
+    set(hax,'YLim',yl);
+    print('-dpdf','test_muscle_mass-5.pdf');    
+
+
+    Pcnl = cat(2,NLdata.Pc);
+    Pcnl = reshape(Pcnl, [size(Pcnl,1) size(NLdata)]);
+
+    figureseries('Nonlinearity effect');
+    clf;
+    j = 4;
+    yl = [Inf -Inf];
+    hax = zeros(4,1);
+    for i = 1:4,
+        switch i
+            case 1
+                good = ~islen & ~isvel;
+                ttl = 'fl=0, fv=0';
+            case 2
+                good = islen & ~isvel;
+                ttl = 'fv=0';
+            case 3
+                good = ~islen & isvel;
+                ttl = 'fl=0';
+            case 4
+                good = islen & isvel;
+                ttl = 'all';
+        end
+        hax(i) = subplot(2,2,i);
+        plot(t, squeeze(Pcnl(:,j,good)));
+        xlabel('Time (s)');
+        ylabel('Force (mN)');
+        title(ttl);
+        if (i == 1)
+            legend('none','stiff=const','work=0','both');
+        end
+        yl1 = ylim;
+        if (yl1(1) < yl(1))
+            yl(1) = yl1(1);
+        end
+        if (yl1(2) > yl(2))
+            yl(2) = yl1(2);
+        end
+    end
+    set(hax,'YLim',yl);
+    print('-dpdf','test_muscle_mass-6.pdf');    
+end
 
 function [hx,dhx] = h(x, par)
 
