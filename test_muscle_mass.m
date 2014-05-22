@@ -6,7 +6,7 @@ function test_muscle_mass
 filename = 'test_muscle_mass.mat';
 
 quiet = true;
-doplot = true;
+doplot = false;
 
 par.L0 = 2.94;                  % mm
 par.Lis = 2.7;                  % mm
@@ -329,7 +329,7 @@ islen = vals(:,1) == 2;
 isvel = vals(:,2) == 2;
 iswork = vals(:,3) == 2;
 stiffval = vals(:,4);
-dutyvals = [0.1 0.36 0.6];
+dutyvals = [0.1 0.36 0.4 0.5];
 N = length(islen) * length(dutyvals);
 
 if (~getvar('-file',filename,'NLdata') || (~quiet && ~inputyn('Use existing data?', 'default',true)))
