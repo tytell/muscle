@@ -339,22 +339,24 @@ if (~getvar('-file',filename,'NLdata') || (~quiet && ~inputyn('Use existing data
             X0 = [0   0   0   0    1    ...
                 0   0];
 
+            par.duty = dutyvals(k);
             par.act = @(t) mod(t,par.T) < par.duty;
             
             [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x, par), 0.005, par.T, X0, ...
                 'Display','iter-detailed', 'fixedperiod',true, 'initialcycles',2, 'TolX',1e-8, 'RelTol',1e-6);
 
-            data1.lc = par.L(data1.t) - data1.x(:,1);
-            data1.vc = par.V(data1.t) - data1.x(:,2);
-            data1.Pc = Pc(data1.lc, data1.vc, data1.x(:,4), par);
+            data1.lc = par.L1 + data1.x(:,Lind) - data1.x(:,ls1ind);
+            data1.vc = data1.x(:,Vind) - data1.x(:,vs1ind);
+            
+            data1.Pc = Pc(data1.lc, data1.vc, data1.x(:,Caf1ind), par);
 
             data1 = get_floquet(data1,@(t,x) jfcn(t,x, par), 100);
-            data1.L = par.L;
             data1.islen = islen(i);
             data1.isvel = isvel(i);
             data1.iswork = iswork(i);
             data1.stiffval = stiffval(i);
-
+            data1.duty = par.duty;
+            
             NLdata = makestructarray(NLdata,data1);
             n = n+1;
             progress(n);

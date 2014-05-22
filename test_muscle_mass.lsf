@@ -5,8 +5,8 @@
 #BSUB -q normal_public6
 
 # the system output and error message output, %J will show as your jobID
-#BSUB -o %J.out
-#BSUB -e %J.err
+#BSUB -o test_muscle_mass.stdout
+#BSUB -e test_muscle_mass.err
 
 #BSUB -u eric.tytell@tufts.edu
 #BSUB -N
