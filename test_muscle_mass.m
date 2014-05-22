@@ -251,8 +251,10 @@ end
 
 zetavals = [0.2 1 2];
 omegarvals = 2*pi* ([0.5 0.8 1 1.2 1.5 2]);
-dutyvals = [0.1 0.36 0.5 0.6];
-if (~getvar('-file',filename,'dutydata') || (~quiet && ~inputyn('Use existing duty cycle data?', 'default',true)))
+dutyvals = [0.1 0.2 0.36 0.4 0.5 0.55];
+n = length(omegarvals) * length(zetavals) * length(dutyvals);
+if (~getvar('-file',filename,'dutydata') || ...
+        (numel(dutydata) ~= n) || (~quiet && ~inputyn('Use existing duty cycle data?', 'default',true)))
     dutydata = struct([]);
     
     X0 = [0   0   0   0    1    ...
@@ -290,6 +292,37 @@ if (~getvar('-file',filename,'dutydata') || (~quiet && ~inputyn('Use existing du
     end
     putvar('-file',filename,'dutydata');
 end
+
+if doplot
+    fexp = cat(2,dutydata.fexp);
+    fexp = reshape(fexp,[size(fexp,1) length(omegarvals) length(zetavals) length(dutyvals)]);
+
+    figureseries('Mode 1 vs damping and duty cycle');
+    clf;
+    lab = cell(size(zetavals));
+    for i = 1:length(zetavals),
+        lab{i} = sprintf('%g',zetavals(i));
+    end
+    h = zeros(3,1);
+    yl = [Inf -Inf];
+    for k = 1:3
+        h(k) = subplot(2,2,k);
+        yy = log(0.5) ./ real(squeeze(fexp(1,:,:,k)));
+        
+        plot(1-omegarvals/(2*pi), yy);
+        xlabel('Frequency different f_{act} - f_{res} (Hz)');
+        ylabel('t_{1/2} (sec)');
+        title(sprintf('Duty cycle = %.2f',dutyvals(k)));
+
+        labellines(lab);
+        
+        yl(1) = min(yl(1),min(yy(:)));
+        yl(2) = max(yl(2),max(yy(:)));
+    end
+    set(h,'YLim',yl);
+    print('-dpdf','test_muscle_mass-5.pdf');    
+end
+
 
 vals = fullfact([2 2 2 3]);
 islen = vals(:,1) == 2;
