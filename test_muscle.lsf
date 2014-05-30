@@ -8,6 +8,9 @@
 #BSUB -o %J.out
 #BSUB -e %J.err
 
+#BSUB -u eric.tytell@tufts.edu
+#BSUB -N
+
 #enter your working directory
 cd ~etytel01/Matlab/muscle
 

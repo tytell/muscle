@@ -3,9 +3,11 @@ function test_muscle
 %optimized parameters:
 %2: m = 0.0542; b = 0.2802; lc0 = 0.9678; k1 = 6.7281; k2 = 23.2794; k30 = 51.3537; k40 = 19.3801; km1 = 17.5804; km2 = 6.0156    ->> sum(dx^2) = 6.056118
 
-filename = '~etytel01/Matlab/muscle/test_muscle.mat';
-nlfilename = '~etytel01/Matlab/muscle/test_muscle_nonlin.mat';
+filename = 'test_muscle.mat';
+nlfilename = 'test_muscle_nonlin.mat';
 quiet = true;
+doanalysis = {'duty'};
+doplot = {};
 
 par.L0 = 2.94;                  % mm
 par.Lis = 2.7;                  % mm
@@ -52,7 +54,7 @@ showphi = [1 6 11 17];
 
 pertmag = 0.1;
     
-if (~getvar('-file',filename,'data') || (~quiet && ~inputyn('Use existing data?', 'default',true)))
+if (ismember('phase',doanalysis))
     n = par.T / dt + 1;
     z = zeros(n,1);
     z5 = zeros(n,5);
@@ -89,122 +91,126 @@ if (~getvar('-file',filename,'data') || (~quiet && ~inputyn('Use existing data?'
     putvar('-file',filename,'data');
 end
 
-Pcall = cat(2,data.Pc);
-
-figureseries('Phase effect');
-clf;
-maxforce = max(Pcall(:));
-hax = -1*ones(4,2);
-for i = 1:4
-    hax(i,1) = subplot(2,2,i);
-    hax(i,2) = copyobj(hax(i,1), gcf);
+if ismember('phase',doplot)
+    getvar('-file',filename,'data');
     
-    pos = get(hax(i,1),'Position');
-    height = pos(4);
-    pos1 = pos;
-    pos1(2) = pos1(2) + 0.25*height;
-    pos1(4) = 0.75*height;
-    pos2 = pos;
-    pos2(4) = 0.25*height;
-    
-    set(hax(i,1),'Position',pos1);
-    set(hax(i,2),'Position',pos2);
-    
-    fill([0 par.actdur par.actdur 0],[0 0 maxforce maxforce],[0.8 0.8 0.8], 'Parent',hax(i,1), ...
-        'EdgeColor','none');
+    Pcall = cat(2,data.Pc);
 
-    fill([0 par.actdur par.actdur 0],par.L1 + par.A*[-1 -1 1 1],[0.8 0.8 0.8], 'Parent',hax(i,2), ...
-        'EdgeColor','none');
+    figureseries('Phase effect');
+    clf;
+    maxforce = max(Pcall(:));
+    hax = -1*ones(4,2);
+    for i = 1:4
+        hax(i,1) = subplot(2,2,i);
+        hax(i,2) = copyobj(hax(i,1), gcf);
 
-    j = showphi(i);
-    
-    addplot(hax(i,1), data(j).t, data(j).Pc, 'r-', 'LineWidth',2);
-    addplot(hax(i,2), data(j).t, data(j).L(data(j).t),'k-');
-    axis(hax(i,2),'tight');
-    xtick(hax(i,1), 'labeloff');
-    
-    xlabel(hax(i,2),'Time (s)');
-    ylabel(hax(i,1),'Force (mN)');
-    
-    yl = get(hax(i,1),'YLim');
-    maxforce = max(maxforce,yl(2));
-end;
-set(hax(:,1),'YLim',[0 maxforce]);
-set(hax, 'TickDir','out');
-set(hax(:,2), 'YAxisLocation','right');
-set(gcf,'Color','w');
-print('-dpdf','PhaseEffect.pdf');
+        pos = get(hax(i,1),'Position');
+        height = pos(4);
+        pos1 = pos;
+        pos1(2) = pos1(2) + 0.25*height;
+        pos1(4) = 0.75*height;
+        pos2 = pos;
+        pos2(4) = 0.25*height;
 
-fxx = cat(4, data.fx);
-sgn1 = sign(fxx(1,1,1,:));
-fxx(:,:,1,:) = bsxfun(@times, fxx(:,:,1,:), sgn1);
+        set(hax(i,1),'Position',pos1);
+        set(hax(i,2),'Position',pos2);
 
-fexp = cat(2,data.fexp);
+        fill([0 par.actdur par.actdur 0],[0 0 maxforce maxforce],[0.8 0.8 0.8], 'Parent',hax(i,1), ...
+            'EdgeColor','none');
 
-figureseries('Mode time constants');
-plot(phitest, log(0.5) ./ real(fexp)');
-xlabel('Phase');
-ylabel('t_{1/2} (sec)');
-title('Mode time constants');
-print('-dpdf','ModeTimeConstants.pdf');
+        fill([0 par.actdur par.actdur 0],par.L1 + par.A*[-1 -1 1 1],[0.8 0.8 0.8], 'Parent',hax(i,2), ...
+            'EdgeColor','none');
 
-t = data(1).t;
+        j = showphi(i);
 
-figureseries('Floquet modes vs. phi');
-clf;
-for i = 1:4,
-    subplot(2,2,i);
-    j = showphi(i);
-    plot(data(j).t, real(fxx(:,:,1,j)));
-    if any(~isreal(fxx(:,:,1,j)))
-        addplot(data(j).t, imag(fxx(:,:,1,j)));
+        addplot(hax(i,1), data(j).t, data(j).Pc, 'r-', 'LineWidth',2);
+        addplot(hax(i,2), data(j).t, data(j).L(data(j).t),'k-');
+        axis(hax(i,2),'tight');
+        xtick(hax(i,1), 'labeloff');
+
+        xlabel(hax(i,2),'Time (s)');
+        ylabel(hax(i,1),'Force (mN)');
+
+        yl = get(hax(i,1),'YLim');
+        maxforce = max(maxforce,yl(2));
+    end;
+    set(hax(:,1),'YLim',[0 maxforce]);
+    set(hax, 'TickDir','out');
+    set(hax(:,2), 'YAxisLocation','right');
+    set(gcf,'Color','w');
+    print('-dpdf','PhaseEffect.pdf');
+
+    fxx = cat(4, data.fx);
+    sgn1 = sign(fxx(1,1,1,:));
+    fxx(:,:,1,:) = bsxfun(@times, fxx(:,:,1,:), sgn1);
+
+    fexp = cat(2,data.fexp);
+
+    figureseries('Mode time constants');
+    plot(phitest, log(0.5) ./ real(fexp)');
+    xlabel('Phase');
+    ylabel('t_{1/2} (sec)');
+    title('Mode time constants');
+    print('-dpdf','ModeTimeConstants.pdf');
+
+    t = data(1).t;
+
+    figureseries('Floquet modes vs. phi');
+    clf;
+    for i = 1:4,
+        subplot(2,2,i);
+        j = showphi(i);
+        plot(data(j).t, real(fxx(:,:,1,j)));
+        if any(~isreal(fxx(:,:,1,j)))
+            addplot(data(j).t, imag(fxx(:,:,1,j)));
+        end
+        xlabel('Time (s)');
+        title(sprintf('\\phi_{act} = %g',phitest(j)));
     end
+    legend('lc','vc','Ca','Caf','m','Location','best');
+    print('-dpdf','FloquetModesVsPhi.pdf');
+
+    figureseries('Floquet exp');
+    clf;
+    i = 1;
+    subplot(2,2,1);
+    plot(data(i).t, fxx(:,:,1,i), 'LineWidth',2);
     xlabel('Time (s)');
-    title(sprintf('\\phi_{act} = %g',phitest(j)));
-end
-legend('lc','vc','Ca','Caf','m','Location','best');
-print('-dpdf','FloquetModesVsPhi.pdf');
+    labellines({'\delta l_c','\delta v_c', '\delta Ca', '\delta Caf', '\delta m'}, ...
+        'location',[0.05 0.1 0.6 0.5 0.8],'rotation',0);
 
-figureseries('Floquet exp');
-clf;
-i = 1;
-subplot(2,2,1);
-plot(data(i).t, fxx(:,:,1,i), 'LineWidth',2);
-xlabel('Time (s)');
-labellines({'\delta l_c','\delta v_c', '\delta Ca', '\delta Caf', '\delta m'}, ...
-    'location',[0.05 0.1 0.6 0.5 0.8],'rotation',0);
+    a = find(t >= phitest(6),1);
+    k = [a:length(t) 1:a-1]';
+    dec = exp(data(i).fexp(1)*data(i).t);
+    dec1 = zeros(size(dec));
+    dec1(k) = dec;
 
-a = find(t >= phitest(6),1);
-k = [a:length(t) 1:a-1]';
-dec = exp(data(i).fexp(1)*data(i).t);
-dec1 = zeros(size(dec));
-dec1(k) = dec;
-
-subplot(2,2,2);
-plot(data(i).t, dec1,'k-', 'LineWidth',2);
-xlabel('Time (s)');
-
-subplot(2,4,6:7);
-plot(data(i).t, bsxfun(@times, fxx(:,:,1,i), dec1), 'LineWidth',2);
-xlabel('Time (s)');
-print('-dpdf','FloquetExp.pdf');
-
-
-
-figureseries('Deviation from steady vs. phi');
-clf;
-for i = 1:4,
-    subplot(2,2,i);
-    j = showphi(i);
-    h1 = plot(data(j).t, data(j).x, 'k--');
-    h2 = addplot(data(j).t, data(j).x + 0.1*real(fxx(:,:,1,j)));
+    subplot(2,2,2);
+    plot(data(i).t, dec1,'k-', 'LineWidth',2);
     xlabel('Time (s)');
-    title(sprintf('\\phi_{act} = %g',phitest(j)));
-end
-legend([h1(1); h2], 'steady','lc','vc','Ca','Caf','m','Location','best');
-print('-dpdf','DevVsPhi.pdf');
 
-if (~getvar('-file',filename,'pertdata') || (~quiet &&~inputyn('Use existing data?', 'default',true)))
+    subplot(2,4,6:7);
+    plot(data(i).t, bsxfun(@times, fxx(:,:,1,i), dec1), 'LineWidth',2);
+    xlabel('Time (s)');
+    print('-dpdf','FloquetExp.pdf');
+
+
+
+    figureseries('Deviation from steady vs. phi');
+    clf;
+    for i = 1:4,
+        subplot(2,2,i);
+        j = showphi(i);
+        h1 = plot(data(j).t, data(j).x, 'k--');
+        h2 = addplot(data(j).t, data(j).x + 0.1*real(fxx(:,:,1,j)));
+        xlabel('Time (s)');
+        title(sprintf('\\phi_{act} = %g',phitest(j)));
+    end
+    legend([h1(1); h2], 'steady','lc','vc','Ca','Caf','m','Location','best');
+    print('-dpdf','DevVsPhi.pdf');
+end
+
+if (ismember('pert',doanalysis))
     i = 3;
     t0 = data(i).t;
     xbase = data(i).x;
@@ -261,53 +267,55 @@ if (~getvar('-file',filename,'pertdata') || (~quiet &&~inputyn('Use existing dat
     putvar('-file',filename,'pertdata');
 end
 
-figureseries('Random perturbations');
-clf;
-i = 3;
-t0 = pertdata(i,1).t;
-xbase = pertdata(i,1).xbase;
-Pcbase = pertdata(i,1).Pcbase;
-lcbase = pertdata(i,1).lcbase;
-vcbase = pertdata(i,1).vcbase;
+if ismember('pert',doplot)
+    getvar('-file',filename,'pertdata');
+    figureseries('Random perturbations');
+    clf;
+    i = 3;
+    t0 = pertdata(i,1).t;
+    xbase = pertdata(i,1).xbase;
+    Pcbase = pertdata(i,1).Pcbase;
+    lcbase = pertdata(i,1).lcbase;
+    vcbase = pertdata(i,1).vcbase;
 
-hax = zeros(4,1);
-for j = 1:4
-    hax(j) = subplot(4,1,j);
+    hax = zeros(4,1);
+    for j = 1:4
+        hax(j) = subplot(4,1,j);
+    end
+
+    plot(hax(1), t0,lcbase, 'k-', 'LineWidth',2);
+    plot(hax(2), t0,vcbase, 'k-', 'LineWidth',2);
+    plot(hax(3), t0,xbase(:,4), 'k-', 'LineWidth',2);
+    plot(hax(4), t0,Pcbase, 'k-', 'LineWidth',2);
+
+    col = 'rgbc';
+    for j = 1:size(pertdata,2)
+        addplot(hax(1), t0,pertdata(i,j).lc, [col(j) '--']);
+        addplot(hax(2), t0,pertdata(i,j).vc, [col(j) '--']);
+        addplot(hax(3), t0,pertdata(i,j).x(:,4), [col(j) '--']);
+        addplot(hax(4), t0,pertdata(i,j).Pc, [col(j) '--']);
+    end
+
+    linkaxes(hax(1:4), 'x');
+    axis(hax(1),'tight');
+    axis(hax(2),'tight');
+    axis(hax(3),'tight');
+    axis(hax(4),'tight');
+    xtick(hax(1),'labeloff');
+    xtick(hax(2),'labeloff');
+    xtick(hax(3),'labeloff');
+
+    ylabel(hax(1),'l_c (cm)');
+    ylabel(hax(2),'v_c (cm/s)');
+    ylabel(hax(3),'Caf');
+    ylabel(hax(4),'P_c (mN)');
+    xlabel(hax(4),'Time (sec)');
+
+    set(hax,'Box','off', 'TickDir','out');
+    print('-dpdf','Pert.pdf');
 end
 
-plot(hax(1), t0,lcbase, 'k-', 'LineWidth',2);
-plot(hax(2), t0,vcbase, 'k-', 'LineWidth',2);
-plot(hax(3), t0,xbase(:,4), 'k-', 'LineWidth',2);
-plot(hax(4), t0,Pcbase, 'k-', 'LineWidth',2);
-
-col = 'rgbc';
-for j = 1:size(pertdata,2)
-    addplot(hax(1), t0,pertdata(i,j).lc, [col(j) '--']);
-    addplot(hax(2), t0,pertdata(i,j).vc, [col(j) '--']);
-    addplot(hax(3), t0,pertdata(i,j).x(:,4), [col(j) '--']);
-    addplot(hax(4), t0,pertdata(i,j).Pc, [col(j) '--']);
-end
-
-linkaxes(hax(1:4), 'x');
-axis(hax(1),'tight');
-axis(hax(2),'tight');
-axis(hax(3),'tight');
-axis(hax(4),'tight');
-xtick(hax(1),'labeloff');
-xtick(hax(2),'labeloff');
-xtick(hax(3),'labeloff');
-
-ylabel(hax(1),'l_c (cm)');
-ylabel(hax(2),'v_c (cm/s)');
-ylabel(hax(3),'Caf');
-ylabel(hax(4),'P_c (mN)');
-xlabel(hax(4),'Time (sec)');
-
-set(hax,'Box','off', 'TickDir','out');
-print('-dpdf','Pert.pdf');
-
-if (~getvar('-file',filename,'devdata','Pcdevall','W0','Wdev') || ...
-    (~quiet && ~inputyn('Use existing data?', 'default',true)))
+if (ismember('dev',doanalysis))
     devdata = struct([]);
     
     figureseries('Test');
@@ -394,63 +402,65 @@ if (~getvar('-file',filename,'devdata','Pcdevall','W0','Wdev') || ...
     end
 end
 
-figureseries('Check Floquet');
-clf;
-showphi = [1 6 11 17];
-k = 1;
-for ii = 1:4
-    i = showphi(ii);
-    for jj = 1:4
-        j = showphi(jj);
-        
-        subplot(4,4,k);
-        plot(devdata(i,j).t,devdata(i,j).xbase,'k-');
-        addplot(devdata(i,j).t,real(devdata(i,j).x), '--', 'LineWidth',2);
-        addplot(devdata(i,j).t,real(devdata(i,j).xfx),':', 'LineWidth',2);
-        k = k+1;
+if ismember('dev',doplot)
+    getvar('-file',filename,'devdata','Pcdevall','W0','Wdev');
+    figureseries('Check Floquet');
+    clf;
+    showphi = [1 6 11 17];
+    k = 1;
+    for ii = 1:4
+        i = showphi(ii);
+        for jj = 1:4
+            j = showphi(jj);
+
+            subplot(4,4,k);
+            plot(devdata(i,j).t,devdata(i,j).xbase,'k-');
+            addplot(devdata(i,j).t,real(devdata(i,j).x), '--', 'LineWidth',2);
+            addplot(devdata(i,j).t,real(devdata(i,j).xfx),':', 'LineWidth',2);
+            k = k+1;
+        end
     end
+    print('-dpdf','CheckFloquet.pdf');
+
+    figureseries('Effect of perturbations');
+    clf;
+    showphi = 1;
+    plot(data(showphi).t, data(showphi).Pc, 'k--','LineWidth',2);
+    for i = 1:4:length(phitest),
+        addplot(data(showphi).t, Pcdevall(:,showphi,i), 'r-');
+    end
+    print('-dpdf','EffectPert.pdf');
+
+    figureseries('Change in work');
+    clf;
+    showphi = 1:5:length(phitest);
+    plot(phitest, bsxfun(@minus,Wdev(showphi,:),W0(showphi)) / max(abs(W0)));
+    xlabel('Perturbation phase');
+    ylabel('Work');
+
+    lab = cell(size(showphi));
+    for i = 1:length(showphi)
+        lab{i} = num2str(phitest(showphi(i)));
+    end
+
+    labellines(lab, 'location',[0.6 0.6 0.65 0.45],'rotation',0);
+    print('-dpdf','ChangeInWork.pdf');
+
+    figureseries('Change in work contour');
+    clf;
+    contourf(phitest, phitest, bsxfun(@minus, Wdev, W0)' / max(abs(W0)));
+    hcol = colorbar;
+
+    xlabel('Phase of activation');
+    ylabel('Phase of perturbation');
+
+    ylabel(hcol, 'Fractional change');
+    print('-dpdf','ChangeInWorkCont.pdf');
 end
-print('-dpdf','CheckFloquet.pdf');
-
-figureseries('Effect of perturbations');
-clf;
-showphi = 1;
-plot(data(showphi).t, data(showphi).Pc, 'k--','LineWidth',2);
-for i = 1:4:length(phitest),
-    addplot(data(showphi).t, Pcdevall(:,showphi,i), 'r-');
-end
-print('-dpdf','EffectPert.pdf');
-
-figureseries('Change in work');
-clf;
-showphi = 1:5:length(phitest);
-plot(phitest, bsxfun(@minus,Wdev(showphi,:),W0(showphi)) / max(abs(W0)));
-xlabel('Perturbation phase');
-ylabel('Work');
-
-lab = cell(size(showphi));
-for i = 1:length(showphi)
-    lab{i} = num2str(phitest(showphi(i)));
-end
-
-labellines(lab, 'location',[0.6 0.6 0.65 0.45],'rotation',0);
-print('-dpdf','ChangeInWork.pdf');
-
-figureseries('Change in work contour');
-clf;
-contourf(phitest, phitest, bsxfun(@minus, Wdev, W0)' / max(abs(W0)));
-hcol = colorbar;
-
-xlabel('Phase of activation');
-ylabel('Phase of perturbation');
-
-ylabel(hcol, 'Fractional change');
-print('-dpdf','ChangeInWorkCont.pdf');
-
 
 L1test = par.lc0 + [-2*par.A 0 2*par.A];
 phitest2 = 0:0.2:0.8;
-if (~getvar('-file',filename,'L1data') || (~quiet && ~inputyn('Use existing data?', 'default',true)))
+if (ismember('length',doanalysis))
     L1orig = par.L1;
     L1data = struct([]);
     N = length(phitest2)*length(L1test);
@@ -487,36 +497,40 @@ if (~getvar('-file',filename,'L1data') || (~quiet && ~inputyn('Use existing data
     par.L1 = L1orig;
 end
 
-lcall = cat(2,L1data.lc);
-lcall = reshape(lcall,[],3,length(phitest2));
+if ismember('length',doplot)
+    getvar('-file',filename,'L1data');
+    
+    lcall = cat(2,L1data.lc);
+    lcall = reshape(lcall,[],3,length(phitest2));
 
-figureseries('Length effect');
-clf;
-subplot(2,2,1);
-lc1 = 0.7*par.lc0:0.01:1.3*par.lc0;
-plot(lc1, lambda(lc1, par), 'k--');
-addplot(squeeze(lcall(:,1,:)), squeeze(lambda(lcall(:,1,:),par)),'b-', ...
-    squeeze(lcall(:,2,:)), squeeze(lambda(lcall(:,2,:),par)),'g-', ...
-    squeeze(lcall(:,3,:)), squeeze(lambda(lcall(:,3,:),par)),'r-', ...
-    'LineWidth',2);
-axis tight;
-xlabel('lc');
-ylabel('\lambda');
+    figureseries('Length effect');
+    clf;
+    subplot(2,2,1);
+    lc1 = 0.7*par.lc0:0.01:1.3*par.lc0;
+    plot(lc1, lambda(lc1, par), 'k--');
+    addplot(squeeze(lcall(:,1,:)), squeeze(lambda(lcall(:,1,:),par)),'b-', ...
+        squeeze(lcall(:,2,:)), squeeze(lambda(lcall(:,2,:),par)),'g-', ...
+        squeeze(lcall(:,3,:)), squeeze(lambda(lcall(:,3,:),par)),'r-', ...
+        'LineWidth',2);
+    axis tight;
+    xlabel('lc');
+    ylabel('\lambda');
 
-subplot(2,2,2);
-plot(t, squeeze(lcall(:,1,:)),'b-', ...
-    t, squeeze(lcall(:,2,:)),'g-', ...
-    t, squeeze(lcall(:,3,:)),'r-');
-xlabel('Time (s)');
-ylabel('lc');
+    subplot(2,2,2);
+    plot(t, squeeze(lcall(:,1,:)),'b-', ...
+        t, squeeze(lcall(:,2,:)),'g-', ...
+        t, squeeze(lcall(:,3,:)),'r-');
+    xlabel('Time (s)');
+    ylabel('lc');
 
-subplot(2,1,2);
-fx = cat(3,L1data.fexp);
-fx = reshape(fx,[5 size(L1data)]);
-plot(phitest2,squeeze(fx(1,:,:)),'o-');
-xlabel('Activation phase');
-ylabel('Mode 1 exponent');
-print('-dpdf','LengthEffect.pdf');
+    subplot(2,1,2);
+    fx = cat(3,L1data.fexp);
+    fx = reshape(fx,[5 size(L1data)]);
+    plot(phitest2,squeeze(fx(1,:,:)),'o-');
+    xlabel('Activation phase');
+    ylabel('Mode 1 exponent');
+    print('-dpdf','LengthEffect.pdf');
+end
 
 vals = fullfact([2 2 2 3]);
 islen = vals(:,1) == 2;
@@ -525,12 +539,9 @@ iswork = vals(:,3) == 2;
 stiffval = vals(:,4);
 N = length(islen)*length(phitest2);
 nldone = false;
-if (getvar('-file',nlfilename','NLdata') && ...
-    (numel(NLdata) == N))
-    nldone = true;
-end
 
-if (~nldone || (~quiet && ~inputyn('Use existing data?', 'default',true)))
+if (ismember('nonlin',doanalysis))
+    getvar('-file',nlfilename','NLdata');
     par0 = par;
     
     progress(0,N, '**** Nonlinear calculations');
@@ -607,96 +618,99 @@ if (~nldone || (~quiet && ~inputyn('Use existing data?', 'default',true)))
     par = par0;
 end
 
-NLdata = reshape(NLdata,[length(phitest2) length(islen)]);
+if ismember('nonlin',doplot)
+    getvar('-file',nlfilename','NLdata');
+    NLdata = reshape(NLdata,[length(phitest2) length(islen)]);
 
-figureseries('Floquet exp vs nonlin');
-clf;
-subplot(2,3,6);
-fx = cat(3,NLdata.fexp);
-fx = reshape(fx,[5 size(NLdata)]);
+    figureseries('Floquet exp vs nonlin');
+    clf;
+    subplot(2,3,6);
+    fx = cat(3,NLdata.fexp);
+    fx = reshape(fx,[5 size(NLdata)]);
 
-clf;
-yl = [Inf -Inf];
-hax = zeros(4,1);
-for i = 1:4,
-    switch i
-        case 1
-            good = ~islen & ~isvel;
-            ttl = 'fl=0, fv=0';
-        case 2
-            good = islen & ~isvel;
-            ttl = 'fv=0';
-        case 3
-            good = ~islen & isvel;
-            ttl = 'fl=0';
-        case 4
-            good = islen & isvel;
-            ttl = 'all';
+    clf;
+    yl = [Inf -Inf];
+    hax = zeros(4,1);
+    for i = 1:4,
+        switch i
+            case 1
+                good = ~islen & ~isvel;
+                ttl = 'fl=0, fv=0';
+            case 2
+                good = islen & ~isvel;
+                ttl = 'fv=0';
+            case 3
+                good = ~islen & isvel;
+                ttl = 'fl=0';
+            case 4
+                good = islen & isvel;
+                ttl = 'all';
+        end
+        hax(i) = subplot(2,2,i);
+        plot(phitest2, squeeze(real(fx(1,:,good))));
+        xlabel('Activation phase');
+        ylabel('Mode 1 exponent');
+        title(ttl);
+        if (i == 1)
+            legend('none','stiff=const','work=0','both');
+        end
+        yl1 = ylim;
+        if (yl1(1) < yl(1))
+            yl(1) = yl1(1);
+        end
+        if (yl1(2) > yl(2))
+            yl(2) = yl1(2);
+        end
     end
-    hax(i) = subplot(2,2,i);
-    plot(phitest2, squeeze(real(fx(1,:,good))));
-    xlabel('Activation phase');
-    ylabel('Mode 1 exponent');
-    title(ttl);
-    if (i == 1)
-        legend('none','stiff=const','work=0','both');
+    set(hax,'YLim',yl);
+    print('-dpdf','FloquetExpVsNonLin.pdf');
+
+
+    Pcnl = cat(2,NLdata.Pc);
+    Pcnl = reshape(Pcnl, [size(Pcnl,1) size(NLdata)]);
+
+    figureseries('Nonlinearity effect');
+    clf;
+    j = 4;
+    yl = [Inf -Inf];
+    hax = zeros(4,1);
+    for i = 1:4,
+        switch i
+            case 1
+                good = ~islen & ~isvel;
+                ttl = 'fl=0, fv=0';
+            case 2
+                good = islen & ~isvel;
+                ttl = 'fv=0';
+            case 3
+                good = ~islen & isvel;
+                ttl = 'fl=0';
+            case 4
+                good = islen & isvel;
+                ttl = 'all';
+        end
+        hax(i) = subplot(2,2,i);
+        plot(t, squeeze(Pcnl(:,j,good)));
+        xlabel('Time (s)');
+        ylabel('Force (mN)');
+        title(ttl);
+        if (i == 1)
+            legend('none','stiff=const','work=0','both');
+        end
+        yl1 = ylim;
+        if (yl1(1) < yl(1))
+            yl(1) = yl1(1);
+        end
+        if (yl1(2) > yl(2))
+            yl(2) = yl1(2);
+        end
     end
-    yl1 = ylim;
-    if (yl1(1) < yl(1))
-        yl(1) = yl1(1);
-    end
-    if (yl1(2) > yl(2))
-        yl(2) = yl1(2);
-    end
+    set(hax,'YLim',yl);
+    print('-dpdf','NonLin.pdf');
 end
-set(hax,'YLim',yl);
-print('-dpdf','FloquetExpVsNonLin.pdf');
-
-
-Pcnl = cat(2,NLdata.Pc);
-Pcnl = reshape(Pcnl, [size(Pcnl,1) size(NLdata)]);
-
-figureseries('Nonlinearity effect');
-clf;
-j = 4;
-yl = [Inf -Inf];
-hax = zeros(4,1);
-for i = 1:4,
-    switch i
-        case 1
-            good = ~islen & ~isvel;
-            ttl = 'fl=0, fv=0';
-        case 2
-            good = islen & ~isvel;
-            ttl = 'fv=0';
-        case 3
-            good = ~islen & isvel;
-            ttl = 'fl=0';
-        case 4
-            good = islen & isvel;
-            ttl = 'all';
-    end
-    hax(i) = subplot(2,2,i);
-    plot(t, squeeze(Pcnl(:,j,good)));
-    xlabel('Time (s)');
-    ylabel('Force (mN)');
-    title(ttl);
-    if (i == 1)
-        legend('none','stiff=const','work=0','both');
-    end
-    yl1 = ylim;
-    if (yl1(1) < yl(1))
-        yl(1) = yl1(1);
-    end
-    if (yl1(2) > yl(2))
-        yl(2) = yl1(2);
-    end
-end
-set(hax,'YLim',yl);
-print('-dpdf','NonLin.pdf');
 
 Btest = [0.05 0.1 0.28 0.5 1 2];
-if (~getvar('-file',filename,'Bdata') || (~quiet && ~inputyn('Use existing B data?', 'default',true)))
+if ismember('damping',doanalysis)
     Bdata = struct([]);
     for i = 1:length(phitest2)
         phi = phitest2(i);
@@ -725,19 +739,22 @@ if (~getvar('-file',filename,'Bdata') || (~quiet && ~inputyn('Use existing B dat
     putvar('-file',filename,'Bdata');
 end
 
-figureseries('Damping effect');
-fx = cat(3,Bdata.fexp);
-fx = reshape(fx,[5 size(Bdata)]);
-plot(Btest,log(0.5) ./ real(squeeze(fx(1,:,:))),'o-');
+if ismember('damping',doplot)
+    getvar('-file',filename,'Bdata');
+    figureseries('Damping effect');
+    fx = cat(3,Bdata.fexp);
+    fx = reshape(fx,[5 size(Bdata)]);
+    plot(Btest,log(0.5) ./ real(squeeze(fx(1,:,:))),'o-');
 
-xlabel('Damping coefficient');
-ylabel('t_{1/2} (sec)');
-title('Mode one time constant vs damping');
-print('-dpdf','Damping.pdf');
+    xlabel('Damping coefficient');
+    ylabel('t_{1/2} (sec)');
+    title('Mode one time constant vs damping');
+    print('-dpdf','Damping.pdf');
+end
 
 k3test = 0.6:0.1:1.4;
 k4test = [0.8 1 1.2];
-if (~getvar('-file',filename,'k34data') || (~quiet && ~inputyn('Use existing k3 k4 data?', 'default',true)))
+if ismember('calcium',doanalysis)
     phi = 0;
     k30 = par.k30;
     k40 = par.k40;
@@ -773,25 +790,80 @@ if (~getvar('-file',filename,'k34data') || (~quiet && ~inputyn('Use existing k3 
     par.k40 = k40;
 end
 
-figureseries('Calcium dynamics effect');
-fx = cat(3,k34data.fexp);
-fx = reshape(fx,[5 size(k34data)]);
-plot(k3test*par.k30,log(0.5) ./ real(squeeze(fx(1,:,:))),'o-');
+if ismember('calcium',doplot)
+    getvar('-file',filename,'k34data');
+    figureseries('Calcium dynamics effect');
+    fx = cat(3,k34data.fexp);
+    fx = reshape(fx,[5 size(k34data)]);
+    plot(k3test*par.k30,log(0.5) ./ real(squeeze(fx(1,:,:))),'o-');
 
-lab = cell(size(k4test));
-for i = 1:length(k4test)
-    lab{i} = sprintf('%.2g',k4test(i)*par.k40);
-    if (i == 1)
-        lab{i} = ['k4 = ' lab{i}];
+    lab = cell(size(k4test));
+    for i = 1:length(k4test)
+        lab{i} = sprintf('%.2g',k4test(i)*par.k40);
+        if (i == 1)
+            lab{i} = ['k4 = ' lab{i}];
+        end
+    end
+    labellines(lab ,'rotation',0);
+
+    xlabel('k3');
+    ylabel('t_{1/2} (sec)');
+    title('Mode one time constant vs k3 and k4');
+    print('-dpdf','Calcium.pdf');
+end
+
+dutyvals = [0.1 0.36 0.5 0.55];
+k3test = 0.6:0.1:1.4;
+k4test = [0.8 1 1.2];
+n = length(k3test) * length(k4test) * length(dutyvals) * length(phitest2);
+[phivals2,dutyvals2, k3vals2, k4vals2] = ndgrid(phitest2,dutyvals,k3test,k4test);
+phivals2 = phivals2(:);
+dutyvals2 = dutyvals2(:);
+k3vals2 = k3vals2(:);
+k4vals2 = k4vals2(:);
+n = length(phivals2);
+if ismember('duty',doanalysis)
+    dutydata = struct([]);
+
+    k30 = par.k30;
+    k40 = par.k40;
+    progress(0,n,'**** Duty cycle tests');
+    for i = 1:n
+        phi = phivals2(i);
+        par.k30 = k3vals2(i)*k30;
+        par.k40 = k4vals2(i)*k40;
+        
+        par.L = @(t) par.L1 + par.A * cos(2*pi/par.T * (t - phi));
+        par.V = @(t) -2*pi/par.T * par.A * sin(2*pi/par.T * (t - phi));
+        X0 = [0   0   0   0   1];
+        
+        par.duty = dutyvals2(i);
+        
+        par.act = @(t) mod(t,par.T) < par.duty;
+        
+        [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x,par), 0.005, par.T, X0, ...
+            'Display','final', 'fixedperiod',true, 'initialcycles',10, 'TolX',1e-8, 'RelTol',1e-6);
+        data1.lc = par.L(data1.t) - data1.x(:,1);
+        data1.vc = par.V(data1.t) - data1.x(:,2);
+        data1.Pc = Pc(data1.lc, data1.vc, data1.x(:,4), par);
+        
+        data1 = get_floquet(data1,@(t,x) jfcn(t,x,par), 150);
+        data1.k30 = par.k30;
+        data1.k40 = par.k40;
+        data1.duty = par.duty;
+        data1.phi = phi;
+        
+        fn = sprintf('dutydata%03d.mat',i);
+        save(fn,'data1');
+        
+        progress(i);
     end
 end
-labellines(lab ,'rotation',0);
 
-xlabel('k3');
-ylabel('t_{1/2} (sec)');
-title('Mode one time constant vs k3 and k4');
-print('-dpdf','Calcium.pdf');
-
+if ismember('duty',doplot)
+    %TODO: Merge dutydata files
+    getvar('-file',filename,'dutydata');
+end    
 
 %--------------------------------------------------------
 function [hx,dhx] = h(x, par)
