@@ -4,9 +4,10 @@ function test_muscle_mass
 %2: m = 0.0542; b = 0.2802; lc0 = 0.9678; k1 = 6.7281; k2 = 23.2794; k30 = 51.3537; k40 = 19.3801; km1 = 17.5804; km2 = 6.0156    ->> sum(dx^2) = 6.056118
 
 filename = 'test_muscle_mass.mat';
+F = load(filename);
 
 quiet = true;
-doplot = false;
+doplot = {'duty','nonlin'};
 
 par.L0 = 2.94;                  % mm
 par.Lis = 2.7;                  % mm
@@ -62,7 +63,7 @@ X0 = [0   0   0   0    1    ...
       0   0];
 check_jacobian(0,X0', 0.02*ones(7,1), @(t,x) odefcn(t,x,par), @(t,x) jfcn(t,x,par));
 
-if doplot
+if ismember('base',doplot)
     tinit = [0 15*par.T];
     odeopt = odeset('RelTol',1e-6); %, 'OutputFcn', @odeplot);
     [t,x] = ode45(@(t,x) odefcn(t,x,par), tinit, X0, odeopt);
@@ -103,7 +104,7 @@ end
 omegarvals = 2*pi* ([0.3:0.05:1 1.2 1.5 2]);
 showfreq = [1 7 15 18];
 
-if (~getvar('-file',filename,'freqdata') || (~quiet && ~inputyn('Use existing frequency data?', 'default',true)))
+if (~isfield(F,'freqdata') || (~quiet && ~inputyn('Use existing frequency data?', 'default',true)))
     freqdata = struct([]);
     
     progress(0,length(omegarvals),'**** Omegar test');
@@ -128,10 +129,13 @@ if (~getvar('-file',filename,'freqdata') || (~quiet && ~inputyn('Use existing fr
         progress(i);
     end
     
-    putvar('-file',filename,'freqdata');
+    F.freqdata = freqdata;
+    save(filename,'-struct','F','freqdata','-append','v7.3');
 end
 
-if doplot
+if ismember('resfreq',doplot)
+    freqdata = F.freqdata;
+    
     figureseries('Res freq');
     xx = cat(3, freqdata.x);
     Pcall = cat(2, freqdata.Pc);
@@ -190,7 +194,7 @@ omegarold = omegarvals;
 zetavals = [0.2 1 2 4];
 omegarvals = 2*pi* ([0.3 0.5 0.8 1 1.2 1.5 2]);
 
-if (~getvar('-file',filename,'dampdata') || (~quiet && ~inputyn('Use existing damping data?', 'default',true)))
+if (~isfield(F,'dampdata') || (~quiet && ~inputyn('Use existing damping data?', 'default',true)))
     dampdata = struct([]);
     
     X0 = [0   0   0   0    1    ...
@@ -220,10 +224,12 @@ if (~getvar('-file',filename,'dampdata') || (~quiet && ~inputyn('Use existing da
             progress(a);
         end
     end
-    putvar('-file',filename,'dampdata');
+    F.dampdata = dampdata;
+    save(filename,'-struct','F','dampdata','-append','v7.3');
 end
 
-if doplot
+if ismember('damping',doplot)
+    dampdata = F.dampdata;
     isomega = ismember(omegarold,omegarvals);
     islowzeta = zetavals < zetaold;
 
@@ -253,8 +259,8 @@ zetavals = [0.2 1 2];
 omegarvals = 2*pi* ([0.5 0.8 1 1.2 1.5 2]);
 dutyvals = [0.1 0.2 0.36 0.4 0.5 0.55];
 n = length(omegarvals) * length(zetavals) * length(dutyvals);
-if (~getvar('-file',filename,'dutydata') || ...
-        (numel(dutydata) ~= n) || (~quiet && ~inputyn('Use existing duty cycle data?', 'default',true)))
+if (~isfield(F,'dutydata') || ...
+        (numel(F.dutydata) ~= n) || (~quiet && ~inputyn('Use existing duty cycle data?', 'default',true)))
     dutydata = struct([]);
     
     X0 = [0   0   0   0    1    ...
@@ -290,10 +296,13 @@ if (~getvar('-file',filename,'dutydata') || ...
             end
         end
     end
-    putvar('-file',filename,'dutydata');
+    F.dutydata = dutydata;
+    save(filename,'-struct','F','dutydata','-append','v7.3');
 end
 
-if doplot
+if ismember('duty',doplot)
+    dutydata = F.dutydata;
+    
     fexp = cat(2,dutydata.fexp);
     fexp = reshape(fexp,[size(fexp,1) length(omegarvals) length(zetavals) length(dutyvals)]);
 
@@ -305,14 +314,18 @@ if doplot
     end
     h = zeros(3,1);
     yl = [Inf -Inf];
-    for k = 1:3
+    
+    showduty = [0.2 0.36 0.4 0.5];
+    for k = 1:4
         h(k) = subplot(2,2,k);
-        yy = log(0.5) ./ real(squeeze(fexp(1,:,:,k)));
+        
+        ind = find(dutyvals == showduty(k));
+        yy = log(0.5) ./ real(squeeze(fexp(1,:,:,ind)));
         
         plot(1-omegarvals/(2*pi), yy);
         xlabel('Frequency different f_{act} - f_{res} (Hz)');
         ylabel('t_{1/2} (sec)');
-        title(sprintf('Duty cycle = %.2f',dutyvals(k)));
+        title(sprintf('Duty cycle = %.2f',dutyvals(ind)));
 
         labellines(lab);
         
@@ -332,7 +345,7 @@ stiffval = vals(:,4);
 dutyvals = [0.1 0.36 0.4 0.5];
 N = length(islen) * length(dutyvals);
 
-if (~getvar('-file',filename,'NLdata') || (~quiet && ~inputyn('Use existing data?', 'default',true)))
+if (~isfield(F,'NLdata') || (~quiet && ~inputyn('Use existing data?', 'default',true)))
     par0 = par;
     
     progress(0,N, '**** Nonlinear calculations');
@@ -396,16 +409,19 @@ if (~getvar('-file',filename,'NLdata') || (~quiet && ~inputyn('Use existing data
         end
     end
 
-    putvar('-file',filename,'NLdata');
+    F.NLdata = NLdata;
+    save(filename,'-struct','F','NLdata','-append','v7.3');
     par = par0;
 end
 
-if doplot
+if ismember('nonlin',doplot)
+    NLdata = F.NLdata;
+    
     figureseries('Floquet exp vs nonlin');
     clf;
     subplot(2,3,6);
     fx = cat(3,NLdata.fexp);
-    fx = reshape(fx,[5 size(NLdata)]);
+    fx = reshape(fx,[size(NLdata(1).fexp,1) size(NLdata)]);
 
     clf;
     yl = [Inf -Inf];

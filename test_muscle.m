@@ -6,8 +6,8 @@ function test_muscle
 filename = 'test_muscle.mat';
 nlfilename = 'test_muscle_nonlin.mat';
 quiet = true;
-doanalysis = {'duty'};
-doplot = {};
+doanalysis = {};
+doplot = {'duty'};
 
 par.L0 = 2.94;                  % mm
 par.Lis = 2.7;                  % mm
