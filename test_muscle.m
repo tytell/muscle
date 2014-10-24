@@ -6,7 +6,7 @@ function test_muscle
 filename = 'test_muscle.mat';
 nlfilename = 'test_muscle_nonlin.mat';
 quiet = true;
-doanalysis = {};
+doanalysis = {'duty'};
 doplot = {'duty'};
 
 par.L0 = 2.94;                  % mm
@@ -51,6 +51,8 @@ par.L = @(t) par.L1 + par.A * cos(2*pi/T * (t - par.phi));
 dt = 0.005;
 phitest = 0:0.05:0.95;
 showphi = [1 6 11 17];
+
+nd = 5;
 
 pertmag = 0.1;
     
@@ -812,19 +814,48 @@ if ismember('calcium',doplot)
     print('-dpdf','Calcium.pdf');
 end
 
-dutyvals = [0.1 0.36 0.5 0.55];
-k3test = 0.6:0.1:1.4;
-k4test = [0.8 1 1.2];
-n = length(k3test) * length(k4test) * length(dutyvals) * length(phitest2);
-[phivals2,dutyvals2, k3vals2, k4vals2] = ndgrid(phitest2,dutyvals,k3test,k4test);
-phivals2 = phivals2(:);
-dutyvals2 = dutyvals2(:);
-k3vals2 = k3vals2(:);
-k4vals2 = k4vals2(:);
-n = length(phivals2);
-if ismember('duty',doanalysis)
-    dutydata = struct([]);
+dutyfile = 'test_muscle_duty.h5';
 
+dutyvals = [0.1 0.2 0.3 0.36 0.4 0.5];
+k3test = [0.8 1 1.2];
+k4test = [0.8 1 1.2];
+[phivals2,dutyvals2, k3vals2, k4vals2] = ndgrid(phitest2,dutyvals,k3test,k4test);
+n = numel(phivals2);
+if ismember('duty',doanalysis)
+    if exist(dutyfile,'file')
+        delete(dutyfile);
+    end
+    h5create(dutyfile,'/phi',size(phivals2));
+    h5write(dutyfile,'/phi',phivals2);
+    h5create(dutyfile,'/duty',size(dutyvals2));
+    h5write(dutyfile,'/duty',dutyvals2);
+    h5create(dutyfile,'/k3',size(k3vals2));
+    h5write(dutyfile,'/k3',k3vals2);
+    h5create(dutyfile,'/k4',size(k4vals2));
+    h5write(dutyfile,'/k4',k4vals2);
+    
+    dt = 0.005;
+    nt = par.T / dt + 1;
+    nfourier = 150;
+    
+    sz = size(phivals2);
+
+    h5create(dutyfile, '/L', [nt sz]);
+    h5create(dutyfile, '/V', [nt sz]);
+
+    h5create(dutyfile, '/Pc', [nt sz]);
+    h5create(dutyfile, '/lc', [nt sz]);
+    h5create(dutyfile, '/vc', [nt sz]);
+    
+    h5create(dutyfile, '/fx', [nt nd nd sz]);
+    h5create(dutyfile, '/fexp', [nd sz]);
+    h5create(dutyfile, '/fmode', [2*nfourier+1 nd nd sz]);
+    
+    phivals2 = phivals2(:);
+    dutyvals2 = dutyvals2(:);
+    k3vals2 = k3vals2(:);
+    k4vals2 = k4vals2(:);
+    
     k30 = par.k30;
     k40 = par.k40;
     progress(0,n,'**** Duty cycle tests');
@@ -837,6 +868,8 @@ if ismember('duty',doanalysis)
         par.V = @(t) -2*pi/par.T * par.A * sin(2*pi/par.T * (t - phi));
         X0 = [0   0   0   0   1];
         
+        [i1,i2,i3,i4] = ind2sub(sz,i);
+
         par.duty = dutyvals2(i);
         
         par.act = @(t) mod(t,par.T) < par.duty;
@@ -847,14 +880,22 @@ if ismember('duty',doanalysis)
         data1.vc = par.V(data1.t) - data1.x(:,2);
         data1.Pc = Pc(data1.lc, data1.vc, data1.x(:,4), par);
         
-        data1 = get_floquet(data1,@(t,x) jfcn(t,x,par), 150);
+        data1 = get_floquet(data1,@(t,x) jfcn(t,x,par), nfourier);
         data1.k30 = par.k30;
         data1.k40 = par.k40;
         data1.duty = par.duty;
         data1.phi = phi;
         
-        fn = sprintf('dutydata%03d.mat',i);
-        save(fn,'data1');
+        h5write(dutyfile, '/L',par.L(data1.t), [1 i1 i2 i3 i4], [nt 1 1 1 1]);
+        h5write(dutyfile, '/V',par.V(data1.t), [1 i1 i2 i3 i4], [nt 1 1 1 1]);
+
+        h5write(dutyfile, '/Pc',data1.Pc, [1 i1 i2 i3 i4], [nt 1 1 1 1]);
+        h5write(dutyfile, '/lc',data1.lc, [1 i1 i2 i3 i4], [nt 1 1 1 1]);
+        h5write(dutyfile, '/vc',data1.vc, [1 i1 i2 i3 i4], [nt 1 1 1 1]);
+
+        h5write(dutyfile, '/fx',data1.fx, [1 1 1 i1 i2 i3 i4], [nt nd nd 1 1 1 1]);
+        h5write(dutyfile, '/fexp',data1.fexp, [1 i1 i2 i3 i4], [nd 1 1 1 1]);
+        h5write(dutyfile, '/fmode',data1.fmode, [1 1 1 i1 i2 i3 i4], [2*nfourier+1 nd nd 1 1 1 1]);
         
         progress(i);
     end
