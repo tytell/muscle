@@ -397,8 +397,8 @@ omegaroldvals = omegarvals;
 dutycycleold = 0.36;
 
 dutyvals = [0.1 0.2 0.3 0.36 0.4 0.5];
-zetavals = [0.2 4];
-omegarvals = 2*pi* ([0.3 2]);
+zetavals = [0.2 0.5 1 2 4];
+omegarvals = 2*pi* ([0.3 0.5 0.8 1 1.2 1.5 2]);
 
 [dutyvals2,zetavals2,omegarvals2] = ndgrid(dutyvals,zetavals,omegarvals);
 if ismember('duty',doanalysis)
@@ -415,13 +415,30 @@ if ismember('duty',doanalysis)
     dt = 0.005;
     t0 = (0:dt:par.T)';
     nt = length(t0);
+    nd = 12;
     nfourier = 150;
     
     sz = size(dutyvals2);
 
-    h5create(dutyfile, '/Pc', [nt sz]);
-    h5create(dutyfile, '/lc', [nt sz]);
-    h5create(dutyfile, '/vc', [nt sz]);
+    h5create(dutyfile, '/t', [nt 1]);
+    h5write(dutyfile, '/t', t0);
+
+    h5create(dutyfile, '/ls', [nt 2 sz]);
+    h5create(dutyfile, '/vs', [nt 2 sz]);
+    h5create(dutyfile, '/Ca', [nt 2 sz]);
+    h5create(dutyfile, '/Caf', [nt 2 sz]);
+    h5create(dutyfile, '/m', [nt 2 sz]);
+
+    h5create(dutyfile, '/Pc', [nt 2 sz]);
+    h5create(dutyfile, '/lc', [nt 2 sz]);
+    h5create(dutyfile, '/vc', [nt 2 sz]);
+
+    h5create(dutyfile, '/L', [nt sz]);
+    h5create(dutyfile, '/V', [nt sz]);
+    
+    h5create(dutyfile, '/fx', [nt nd nd sz]);
+    h5create(dutyfile, '/fexp', [nd sz]);
+    h5create(dutyfile, '/fmode', [2*nfourier+1 nd nd sz]);
 
     dutydata = struct([]);
     
@@ -429,38 +446,49 @@ if ismember('duty',doanalysis)
           0   0   0   0    1    ...
           0   0];
     
-    a = 1;
-    n = length(omegarvals) * length(zetavals) * length(dutycyclevals);
+    dutyvals2 = dutyvals2(:);
+    zetavals2 = zetavals2(:);
+    omegarvals2 = omegarvals2(:);
+    
+    n = numel(dutyvals2);
     progress(0,n, '**** Duty cycle tests');
-    for k = 1:length(dutycyclevals)
-        par.duty = dutycyclevals(k);
+    for k = 1:n
+        par.duty = dutyvals2(k);
+        par.zeta = zetavals2(k);
+        par.omegar = omegarvals2(k);
+        fprintf('Duty = %g, Zeta = %g, OmegaR = %g\n', par.duty, par.zeta, par.omegar);
         
-        for j = 1:length(zetavals)
-            par.zeta = zetavals(j);
-            for i = 1:length(omegarvals)
-                par.omegar = omegarvals(i);
-                fprintf('Duty = %g, Zeta = %g, OmegaR = %g\n', par.duty, par.zeta, par.omegar);
+        [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x,par), dt, par.T, X0, ...
+            'Display','final', 'fixedperiod',true, 'initialcycles',10, 'TolX',1e-8, 'RelTol',1e-6);
+        data1.lc = par.L1 + data1.x(:,Lind)*[1 -1] - data1.x(:,[ls1ind ls2ind]);
+        data1.vc = data1.x(:,Vind)*[1 -1] - data1.x(:,[vs1ind vs2ind]);
+        
+        data1.Pc = Pc(data1.lc, data1.vc, data1.x(:,[Caf1ind Caf2ind]), par);
+        
+        data1 = get_floquet(data1,@(t,x) jfcn(t,x, par), nfourier);
+        
+        [i1,i2,i3] = ind2sub(sz,k);
 
-                [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x,par), dt, par.T, X0, ...
-                    'Display','final', 'fixedperiod',true, 'initialcycles',10, 'TolX',1e-8, 'RelTol',1e-6);
-                data1.lc = par.L1 + data1.x(:,Lind)*[1 -1] - data1.x(:,[ls1ind ls2ind]);
-                data1.vc = data1.x(:,Vind)*[1 -1] - data1.x(:,[vs1ind vs2ind]);
+        h5write(dutyfile, '/ls', data1.x(:,[1 6]), [1 1 i1 i2 i3], [nt 2 1 1 1]);
+        h5write(dutyfile, '/vs', data1.x(:,[2 7]), [1 1 i1 i2 i3], [nt 2 1 1 1]);
+        h5write(dutyfile, '/Ca', data1.x(:,[3 8]), [1 1 i1 i2 i3], [nt 2 1 1 1]);
+        h5write(dutyfile, '/Caf', data1.x(:,[4 9]), [1 1 i1 i2 i3], [nt 2  1 1 1]);
+        h5write(dutyfile, '/m', data1.x(:,[5 10]), [1 1 i1 i2 i3], [nt 2 1 1 1]);
+        
+        h5write(dutyfile, '/Pc',data1.Pc, [1 1 i1 i2 i3], [nt 2 1 1 1]);
+        h5write(dutyfile, '/lc',data1.lc, [1 1 i1 i2 i3], [nt 2 1 1 1]);
+        h5write(dutyfile, '/vc',data1.vc, [1 1 i1 i2 i3], [nt 2 1 1 1]);
 
-                data1.Pc = Pc(data1.lc, data1.vc, data1.x(:,[Caf1ind Caf2ind]), par);
+        h5write(dutyfile, '/fx',data1.fx, [1 1 1 i1 i2 i3], [nt nd nd 1 1 1]);
+        h5write(dutyfile, '/fexp',data1.fexp, [1 i1 i2 i3], [nd 1 1 1]);
+        h5write(dutyfile, '/fmode',data1.fmode, [1 1 1 i1 i2 i3], [2*nfourier+1 nd nd 1 1 1]);
 
-                data1 = get_floquet(data1,@(t,x) jfcn(t,x, par), nfourier);
-                
-                data1.dutycycle = par.duty;
-                data1.zeta = par.zeta;
-                data1.omegar = par.omegar;
-                dutydata = makestructarray(dutydata,data1);
-
-                a = a+1;              
-                progress(a);
-            end
-        end
+        data1.dutycycle = par.duty;
+        data1.zeta = par.zeta;
+        data1.omegar = par.omegar;
+        
+        progress(k);
     end
-    putvar('-file',filename, 'dutydata');
 end
 
 if ismember('duty',doplot)
