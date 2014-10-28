@@ -31,7 +31,7 @@ for k = 1:length(fields)
     end
 end
 
-timedWaitBar(0,'Merging data...');
+progress(0,length(filenames),'Merging data...');
 for i = 1:length(filenames)
     F = load(filenames{i},'data1');
     data1 = struct2cell(F.data1);
@@ -54,7 +54,6 @@ for i = 1:length(filenames)
             h5write(outfile,['/' fields{k}], data1{k}, start,count);
         end
     end
-    timedWaitBar(i/length(filenames),'Merging data...');
+    progress(i);
 end
-timedWaitBar(1);
 
