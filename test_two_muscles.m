@@ -5,7 +5,7 @@ function test_two_muscles
 
 filename = 'test_two_muscles.mat';
 quiet = true;
-doanalysis = {'duty'};
+doanalysis = {'duty','nonlin'};
 doplot = {};
 
 par.L0 = 2.94;                  % mm
@@ -537,87 +537,153 @@ if ismember('duty',doplot)
     print('-dpdf','test_two_muscles-10.pdf');
 end
 
-vals = fullfact([2 2 2 1]);
+nonlinfile = 'test_two_muscles_nonlin.h5';
+
+
+vals = fullfact([2 2 2 3]);
 islen = vals(:,1) == 2;
 isvel = vals(:,2) == 2;
 iswork = vals(:,3) == 2;
 stiffval = vals(:,4);
 
 par0 = par;
-dutycyclevals = [0.2 0.36 0.5 0.7];
-omegarvals = 2*pi* ([0.5 1 2]);
+dutycyclevals = [0.2 0.36 0.4 0.5];
+zetavals = [0.2 0.5 1 2 4];
+omegarvals = 2*pi* ([0.3 0.5 0.8 1 1.2 1.5 2]);
+
+[dutyvals2,zetavals2,omegarvals2,nonlinind] = ...
+    ndgrid(dutycyclevals,zetavals,omegarvals,1:length(islen));
 if ismember('nonlin',doanalysis)
-    nonlindata = struct([]);
+    if exist(dutyfile,'file')
+        delete(dutyfile);
+    end
+    h5create(dutyfile,'/duty',size(dutyvals2));
+    h5write(dutyfile,'/duty',dutyvals2);
+    h5create(dutyfile,'/zeta',size(zetavals2));
+    h5write(dutyfile,'/zeta',zetavals2);
+    h5create(dutyfile,'/omegar',size(omegarvals2));
+    h5write(dutyfile,'/omegar',omegarvals2);
+    h5create(dutyfile,'/nonlinind',size(omegarvals2));
+    h5write(dutyfile,'/nonlinind',nonlinind);
+
+    h5create(dutyfile,'/islen',size(omegarvals2));
+    h5write(dutyfile,'/islen',uint8(islen(nonlinind)));
+    h5create(dutyfile,'/isvel',size(omegarvals2));
+    h5write(dutyfile,'/isvel',uint8(isvel(nonlinind)));
+    h5create(dutyfile,'/iswork',size(omegarvals2));
+    h5write(dutyfile,'/iswork',uint8(iswork(nonlinind)));
+    h5create(dutyfile,'/stiff',size(omegarvals2));
+    h5write(dutyfile,'/stiff',stiffval(nonlinind));
     
+    dt = 0.005;
+    t0 = (0:dt:par.T)';
+    nt = length(t0);
+    nd = 12;
+    nfourier = 150;
+    
+    sz = size(dutyvals2);
+
+    h5create(dutyfile, '/t', [nt 1]);
+    h5write(dutyfile, '/t', t0);
+
+    h5create(dutyfile, '/ls', [nt 2 sz]);
+    h5create(dutyfile, '/vs', [nt 2 sz]);
+    h5create(dutyfile, '/Ca', [nt 2 sz]);
+    h5create(dutyfile, '/Caf', [nt 2 sz]);
+    h5create(dutyfile, '/m', [nt 2 sz]);
+
+    h5create(dutyfile, '/Pc', [nt 2 sz]);
+    h5create(dutyfile, '/lc', [nt 2 sz]);
+    h5create(dutyfile, '/vc', [nt 2 sz]);
+
+    h5create(dutyfile, '/L', [nt sz]);
+    h5create(dutyfile, '/V', [nt sz]);
+    
+    h5create(dutyfile, '/fx', [nt nd nd sz]);
+    h5create(dutyfile, '/fexp', [nd sz]);
+    h5create(dutyfile, '/fmode', [2*nfourier+1 nd nd sz]);
+
     X0 = [0   0   0   0    1    ...
           0   0   0   0    1    ...
           0   0];
     par.zeta = zetaold;
     
     a = 1;
-    n = length(dutycyclevals) * length(omegarvals) * length(islen);
+    n = numel(dutyvals2);
     progress(0,n, '**** Nonlinear calculations');
-    for k = 1:length(dutycyclevals)
-        par.duty = dutycyclevals(k);
-        for j = 1:length(omegarvals)
-            par.omegar = omegarvals(j);
-            for i = 1:length(islen)
-                if (islen(i))
-                    par.lambda2 = par0.lambda2;
-                else
-                    par.lambda2 = 0;
-                end
-                if (isvel(i))
-                    par.alpham = par0.alpham;
-                    par.alphap = par0.alphap;
-                else
-                    par.alpham = 0;
-                    par.alphap = 0;
-                end
-                if (iswork(i))
-                    par.km1 = par0.km1;
-                else
-                    par.km1 = 0;
-                end
-                switch stiffval(i)
-                    case 1
-                        par.mu0 = par0.mu0 + par0.mu1;
-                        par.mu1 = 0;
-                    case 2
-                        par.mu0 = par0.mu0;
-                        par.mu1 = 0;
-                    case 3
-                        par.mu0 = par0.mu0;
-                        par.mu1 = par0.mu1;
-                end
-                
-                fprintf('Duty = %g, OmegaR = %g, Nonlin = %d\n', par.duty, par.omegar, i);
-
-                [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x,par), 0.005, par.T, X0, ...
-                    'Display','final', 'fixedperiod',true, 'initialcycles',10, 'TolX',1e-8, 'RelTol',1e-6);
-                data1.lc = par.L1 + data1.x(:,Lind)*[1 -1] - data1.x(:,[ls1ind ls2ind]);
-                data1.vc = data1.x(:,Vind)*[1 -1] - data1.x(:,[vs1ind vs2ind]);
-                data1.Pc = Pc(data1.lc, data1.vc, data1.x(:,[Caf1ind Caf2ind]), par);
-
-                data1 = get_floquet(data1,@(t,x) jfcn(t,x,par), 150);
-                
-                data1.dutycycle = par.duty;
-                data1.zeta = par.zeta;
-                data1.omegar = par.omegar;
-                data1.lambda2 = par.lambda2;
-                data1.islen = islen(i);
-                data1.isvel = isvel(i);
-                data1.iswork = iswork(i);
-                data1.stiffval = stiffval(i);
-                
-                nonlindata = makestructarray(nonlindata,data1);
-                a = a+1;
-                
-                progress(n)
-            end
+    for k = 1:n
+        par.duty = dutyvals2(k);
+        par.zeta = zetavals2(k);
+        par.omegar = omegarvals2(k);
+        
+        i = nonlinind(k);
+        if (islen(i))
+            par.lambda2 = par0.lambda2;
+        else
+            par.lambda2 = 0;
         end
+        if (isvel(i))
+            par.alpham = par0.alpham;
+            par.alphap = par0.alphap;
+        else
+            par.alpham = 0;
+            par.alphap = 0;
+        end
+        if (iswork(i))
+            par.km1 = par0.km1;
+        else
+            par.km1 = 0;
+        end
+        switch stiffval(i)
+            case 1
+                par.mu0 = par0.mu0 + par0.mu1;
+                par.mu1 = 0;
+            case 2
+                par.mu0 = par0.mu0;
+                par.mu1 = 0;
+            case 3
+                par.mu0 = par0.mu0;
+                par.mu1 = par0.mu1;
+        end
+        
+        fprintf('Duty = %g, OmegaR = %g, Nonlin = %d\n', par.duty, par.omegar, i);
+        
+        [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x,par), 0.005, par.T, X0, ...
+            'Display','final', 'fixedperiod',true, 'initialcycles',10, 'TolX',1e-8, 'RelTol',1e-6);
+        data1.lc = par.L1 + data1.x(:,Lind)*[1 -1] - data1.x(:,[ls1ind ls2ind]);
+        data1.vc = data1.x(:,Vind)*[1 -1] - data1.x(:,[vs1ind vs2ind]);
+        data1.Pc = Pc(data1.lc, data1.vc, data1.x(:,[Caf1ind Caf2ind]), par);
+        
+        data1 = get_floquet(data1,@(t,x) jfcn(t,x,par), 150);
+        
+        data1.dutycycle = par.duty;
+        data1.zeta = par.zeta;
+        data1.omegar = par.omegar;
+        data1.lambda2 = par.lambda2;
+        data1.islen = islen(i);
+        data1.isvel = isvel(i);
+        data1.iswork = iswork(i);
+        data1.stiffval = stiffval(i);
+        
+        [i1,i2,i3,i4] = ind2sub(sz,k);
+        ind = [i1 i2 i3 i4];
+        
+        h5write(dutyfile, '/ls', data1.x(:,[1 6]), [1 1 ind], [nt 2 ones(size(ind))]);
+        h5write(dutyfile, '/vs', data1.x(:,[2 7]), [1 1 ind], [nt 2 ones(size(ind))]);
+        h5write(dutyfile, '/Ca', data1.x(:,[3 8]), [1 1 ind], [nt 2 ones(size(ind))]);
+        h5write(dutyfile, '/Caf', data1.x(:,[4 9]), [1 1 ind], [nt 2  ones(size(ind))]);
+        h5write(dutyfile, '/m', data1.x(:,[5 10]), [1 1 ind], [nt 2 ones(size(ind))]);
+        
+        h5write(dutyfile, '/Pc',data1.Pc, [1 1 ind], [nt 2 ones(size(ind))]);
+        h5write(dutyfile, '/lc',data1.lc, [1 1 ind], [nt 2 ones(size(ind))]);
+        h5write(dutyfile, '/vc',data1.vc, [1 1 ind], [nt 2 ones(size(ind))]);
+
+        h5write(dutyfile, '/fx',data1.fx, [1 1 1 ind], [nt nd nd ones(size(ind))]);
+        h5write(dutyfile, '/fexp',data1.fexp, [1 ind], [nd ones(size(ind))]);
+        h5write(dutyfile, '/fmode',data1.fmode, [1 1 1 ind], [2*nfourier+1 nd nd ones(size(ind))]);
+        
+        progress(k);
     end
-    putvar nonlindata;
 end
 
 if ismember('nonlin',doplot)
