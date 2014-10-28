@@ -5,7 +5,8 @@ function test_two_muscles
 
 filename = 'test_two_muscles.mat';
 quiet = true;
-doplot = true;
+doanalysis = {'duty'};
+doplot = {};
 
 par.L0 = 2.94;                  % mm
 par.Lis = 2.7;                  % mm
@@ -72,7 +73,7 @@ X0 = [0   0   0   0    1    ...
       0   0];
 check_jacobian(0,X0', 0.02*ones(12,1), @(t,x) odefcn(t,x,par), @(t,x) jfcn(t,x,par));
 
-if doplot
+if ismember('base',doplot)
     tinit = [0 15*par.T];
     odeopt = odeset('RelTol',1e-6); %, 'OutputFcn', @odeplot);
     [t,x] = ode45(@(t,x) odefcn(t,x,par), tinit, X0, odeopt);
@@ -116,7 +117,7 @@ if doplot
     print('-dpdf','test_two_muscles-0.pdf');
 end
 
-if (~getvar('-file',filename,'freqdata') || (~quiet && ~inputyn('Use existing frequency data?', 'default',true)))
+if ismember('freq',doanalysis)
     freqdata = struct([]);
     
     progress(0,length(omegarvals),'**** Omegar test');
@@ -145,7 +146,7 @@ if (~getvar('-file',filename,'freqdata') || (~quiet && ~inputyn('Use existing fr
     putvar('-file',filename,'freqdata');
 end
 
-if doplot
+if ismember('freq',doplot)
     figureseries('Time series res freq');
     clf;
     xx = [0 par.duty par.duty 0; 0.5 par.duty+0.5 par.duty+0.5 0.5]';
@@ -280,7 +281,7 @@ omegarold = omegarvals;
 zetavals = [0.2 1 2 4];
 omegarvals = 2*pi* ([0.3 0.5 0.8 1 1.2 1.5 2]);
 
-if (~getvar('-file',filename,'dampdata') || (~quiet && ~inputyn('Use existing damping data?', 'default',true)))
+if ismember('damping',doanalysis)
     dampdata = struct([]);
     
     X0 = [0   0   0   0    1    ...
@@ -316,7 +317,7 @@ if (~getvar('-file',filename,'dampdata') || (~quiet && ~inputyn('Use existing da
     putvar('-file',filename,'dampdata');    
 end
 
-if doplot
+if ismember('damping',doplot)
     isomega = ismember(omegarold,omegarvals);
     islowzeta = zetavals < zetaold;
 
@@ -389,14 +390,39 @@ if doplot
     print('-dpdf','test_two_muscles-8.pdf');
 end
 
+dutyfile = 'test_two_muscles_duty.h5';
+
 zetaoldvals = zetavals;
 omegaroldvals = omegarvals;
 dutycycleold = 0.36;
 
-dutycyclevals = [0.2 0.5 0.7];
+dutyvals = [0.1 0.2 0.3 0.36 0.4 0.5];
 zetavals = [0.2 4];
 omegarvals = 2*pi* ([0.3 2]);
-if (~getvar('-file',filename,'dutydata') || (~quiet && ~inputyn('Use existing damping data?', 'default',true)))
+
+[dutyvals2,zetavals2,omegarvals2] = ndgrid(dutyvals,zetavals,omegarvals);
+if ismember('duty',doanalysis)
+    if exist(dutyfile,'file')
+        delete(dutyfile);
+    end
+    h5create(dutyfile,'/duty',size(dutyvals2));
+    h5write(dutyfile,'/duty',dutyvals2);
+    h5create(dutyfile,'/zeta',size(zetavals2));
+    h5write(dutyfile,'/zeta',zetavals2);
+    h5create(dutyfile,'/omegar',size(omegarvals2));
+    h5write(dutyfile,'/omegar',omegarvals2);
+    
+    dt = 0.005;
+    t0 = (0:dt:par.T)';
+    nt = length(t0);
+    nfourier = 150;
+    
+    sz = size(dutyvals2);
+
+    h5create(dutyfile, '/Pc', [nt sz]);
+    h5create(dutyfile, '/lc', [nt sz]);
+    h5create(dutyfile, '/vc', [nt sz]);
+
     dutydata = struct([]);
     
     X0 = [0   0   0   0    1    ...
@@ -415,14 +441,14 @@ if (~getvar('-file',filename,'dutydata') || (~quiet && ~inputyn('Use existing da
                 par.omegar = omegarvals(i);
                 fprintf('Duty = %g, Zeta = %g, OmegaR = %g\n', par.duty, par.zeta, par.omegar);
 
-                [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x,par), 0.005, par.T, X0, ...
+                [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x,par), dt, par.T, X0, ...
                     'Display','final', 'fixedperiod',true, 'initialcycles',10, 'TolX',1e-8, 'RelTol',1e-6);
                 data1.lc = par.L1 + data1.x(:,Lind)*[1 -1] - data1.x(:,[ls1ind ls2ind]);
                 data1.vc = data1.x(:,Vind)*[1 -1] - data1.x(:,[vs1ind vs2ind]);
 
                 data1.Pc = Pc(data1.lc, data1.vc, data1.x(:,[Caf1ind Caf2ind]), par);
 
-                data1 = get_floquet(data1,@(t,x) jfcn(t,x, par), 150);
+                data1 = get_floquet(data1,@(t,x) jfcn(t,x, par), nfourier);
                 
                 data1.dutycycle = par.duty;
                 data1.zeta = par.zeta;
@@ -437,7 +463,7 @@ if (~getvar('-file',filename,'dutydata') || (~quiet && ~inputyn('Use existing da
     putvar('-file',filename, 'dutydata');
 end
 
-if doplot
+if ismember('duty',doplot)
     isomega = ismember(omegaroldvals,omegarvals);
     iszeta = ismember(zetaoldvals,zetavals);
     islowduty = dutycyclevals < dutycycleold;
@@ -492,7 +518,7 @@ stiffval = vals(:,4);
 par0 = par;
 dutycyclevals = [0.2 0.36 0.5 0.7];
 omegarvals = 2*pi* ([0.5 1 2]);
-if (~getvar('-file',filename,'nonlindata') || (~quiet && ~inputyn('Use existing nonlinear data?', 'default',true)))
+if ismember('nonlin',doanalysis)
     nonlindata = struct([]);
     
     X0 = [0   0   0   0    1    ...
@@ -566,7 +592,7 @@ if (~getvar('-file',filename,'nonlindata') || (~quiet && ~inputyn('Use existing 
     putvar nonlindata;
 end
 
-if doplot
+if ismember('nonlin',doplot)
     nonlindata = reshape(nonlindata, [5 length(omegarvals) length(dutycyclevals)]);
 
     Pcall = cat(3, nonlindata.Pc);
