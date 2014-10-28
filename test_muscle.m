@@ -835,14 +835,23 @@ if ismember('duty',doanalysis)
     h5write(dutyfile,'/k4',k4vals2);
     
     dt = 0.005;
-    nt = par.T / dt + 1;
+    t0 = (0:dt:par.T)';
+    nt = length(t0);
     nfourier = 150;
     
     sz = size(phivals2);
 
+    h5create(dutyfile, '/t', [nt 1]);
+    h5write(dutyfile, '/t', t0);
     h5create(dutyfile, '/L', [nt sz]);
     h5create(dutyfile, '/V', [nt sz]);
 
+    h5create(dutyfile, '/ls', [nt sz]);
+    h5create(dutyfile, '/vs', [nt sz]);
+    h5create(dutyfile, '/Ca', [nt sz]);
+    h5create(dutyfile, '/Caf', [nt sz]);
+    h5create(dutyfile, '/m', [nt sz]);
+    
     h5create(dutyfile, '/Pc', [nt sz]);
     h5create(dutyfile, '/lc', [nt sz]);
     h5create(dutyfile, '/vc', [nt sz]);
@@ -889,6 +898,12 @@ if ismember('duty',doanalysis)
         h5write(dutyfile, '/L',par.L(data1.t), [1 i1 i2 i3 i4], [nt 1 1 1 1]);
         h5write(dutyfile, '/V',par.V(data1.t), [1 i1 i2 i3 i4], [nt 1 1 1 1]);
 
+        h5write(dutyfile, '/ls', data1.x(:,1), [1 i1 i2 i3 i4], [nt 1 1 1 1]);
+        h5write(dutyfile, '/vs', data1.x(:,2), [1 i1 i2 i3 i4], [nt 1 1 1 1]);
+        h5write(dutyfile, '/Ca', data1.x(:,3), [1 i1 i2 i3 i4], [nt 1 1 1 1]);
+        h5write(dutyfile, '/Caf', data1.x(:,4), [1 i1 i2 i3 i4], [nt 1 1 1 1]);
+        h5write(dutyfile, '/m', data1.x(:,5), [1 i1 i2 i3 i4], [nt 1 1 1 1]);
+        
         h5write(dutyfile, '/Pc',data1.Pc, [1 i1 i2 i3 i4], [nt 1 1 1 1]);
         h5write(dutyfile, '/lc',data1.lc, [1 i1 i2 i3 i4], [nt 1 1 1 1]);
         h5write(dutyfile, '/vc',data1.vc, [1 i1 i2 i3 i4], [nt 1 1 1 1]);
