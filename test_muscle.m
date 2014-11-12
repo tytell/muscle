@@ -6,7 +6,7 @@ function test_muscle
 filename = 'test_muscle.h5';
 nlfilename = 'test_muscle_nonlin.mat';
 quiet = true;
-doanalysis = {'phase'};
+doanalysis = {}; %{'phase'};
 doplot = {'phase','pert','dev','length','nonlin','damping','calcium'};
 
 par.L0 = 2.94;                  % mm
@@ -79,8 +79,11 @@ if (ismember('phase',doanalysis))
         [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x,par), dt, par.T, X0, ...
             'Display','iter-detailed', 'fixedperiod',true, 'initialcycles',2, 'TolX',1e-8, 'RelTol',1e-6);
         data1.phi = phi1;
-        data1.L = par.L;
-        data1.V = par.V;
+        data1.L = par.L(data1.t);
+        data1.V = par.V(data1.t);
+        data1.L1 = par.L1;
+        data1.A = par.A;
+        data1.T = par.T;
         data1.lc = data1.L(data1.t) - data1.x(:,1);
         data1.vc = data1.V(data1.t) - data1.x(:,2);
         data1.Pc = Pc(data1.lc, data1.vc, data1.x(:,4), par);
@@ -126,7 +129,7 @@ if ismember('phase',doplot)
         j = showphi(i);
 
         addplot(hax(i,1), data(j).t, data(j).Pc, 'r-', 'LineWidth',2);
-        addplot(hax(i,2), data(j).t, data(j).L(data(j).t),'k-');
+        addplot(hax(i,2), data(j).t, data(j).L,'k-');
         axis(hax(i,2),'tight');
         xtick(hax(i,1), 'labeloff');
 
@@ -222,8 +225,8 @@ if (ismember('pert',doanalysis))
     
     phi1 = phitest(i);
 
-    par.L = data(i).L;
-    par.V = data(i).V;
+    par.L = @(t) data(i).L1 + data(i).A * cos(2*pi/data(i).T * (t - data(i).phi));
+    par.V = @(t) -2*pi/data(i).T * data(i).A * sin(2*pi/data(i).T * (t - data(i).phi));
     
     phipert = [0.2 0.7 0.2 0.2];
     pertval = [0.1 0 0 0 0; ...
@@ -270,7 +273,8 @@ if (ismember('pert',doanalysis))
 end
 
 if ismember('pert',doplot)
-    getvar('-file',filename,'pertdata');
+    pertdata = h5readstruct(filename,'rootgroup','pert');
+
     figureseries('Random perturbations');
     clf;
     i = 3;
@@ -399,13 +403,22 @@ if (ismember('dev',doanalysis))
             
             progress(n);
         end
-        putvar('-file',filename,'devdata','Pcdevall','W0','Wdev');
-        %pause;
+        h5writestruct(filename,devdata,'rootgroup','dev');
+        h5create(filename,'/Pcdevall',size(Pcdevall));
+        h5write(filename,'/Pcdevall',Pcdevall);
+        h5create(filename,'/W0',size(W0));
+        h5write(filename,'/W0',W0);
+        h5create(filename,'/Wdev',size(Wdev));
+        h5write(filename,'/Wdev',Wdev);
     end
 end
 
 if ismember('dev',doplot)
-    getvar('-file',filename,'devdata','Pcdevall','W0','Wdev');
+    devdata = h5readstruct(filename,'rootgroup','dev');
+    Pcdevall = h5read(filename,'/Pcdevall');
+    W0 = h5read(filename,'/Pcdevall');
+    Wdev = h5read(filename,'/Pcdevall');
+    
     figureseries('Check Floquet');
     clf;
     showphi = [1 6 11 17];
@@ -493,14 +506,13 @@ if (ismember('length',doanalysis))
         end
     end
     L1data = reshape(L1data,[length(L1test) length(phitest2)]);
-    putvar('-file',filename,'L1data');
-    
+    h5writestruct(filename,L1data,'rootgroup','length');
     %reset L1
     par.L1 = L1orig;
 end
 
 if ismember('length',doplot)
-    getvar('-file',filename,'L1data');
+    L1data = h5readstruct(filename,'rootgroup','length');
     
     lcall = cat(2,L1data.lc);
     lcall = reshape(lcall,[],3,length(phitest2));
@@ -543,20 +555,9 @@ N = length(islen)*length(phitest2);
 nldone = false;
 
 if (ismember('nonlin',doanalysis))
-    getvar('-file',nlfilename','NLdata');
     par0 = par;
     
     progress(0,N, '**** Nonlinear calculations');
-    if ~exist('NLdata','var')
-        NLdata = struct([]);
-        n = 0;
-        i0 = 1;
-    else
-        i0 = floor(length(NLdata)/length(phitest2));
-        n = i0*length(phitest);
-        NLdata = NLdata(1:n);
-        i0 = i0+1;
-    end
     for i = i0:length(islen)
         if (islen(i))
             par.lambda2 = par0.lambda2;
@@ -612,17 +613,15 @@ if (ismember('nonlin',doanalysis))
             n = n+1;
             progress(n);
         end
-        putvar('-file',nlfilename,'NLdata');
     end
     NLdata = reshape(NLdata,[length(phitest2) length(islen)]);
 
-    putvar('-file',filename,'NLdata');
+    h5writestruct(filename,NLdata,'rootgroup','nonlin');
     par = par0;
 end
 
 if ismember('nonlin',doplot)
-    getvar('-file',nlfilename','NLdata');
-    NLdata = reshape(NLdata,[length(phitest2) length(islen)]);
+    NLdata = h5readstruct(filename,'rootgroup','nonlin');
 
     figureseries('Floquet exp vs nonlin');
     clf;
@@ -738,11 +737,11 @@ if ismember('damping',doanalysis)
         end
     end
     Bdata = reshape(Bdata,[length(Btest) length(phitest2)]);
-    putvar('-file',filename,'Bdata');
+    h5writestruct(filename,Bdata,'rootgroup','damping');
 end
 
 if ismember('damping',doplot)
-    getvar('-file',filename,'Bdata');
+    Bdata = h5readstruct(filename,'rootgroup','damping');
     figureseries('Damping effect');
     fx = cat(3,Bdata.fexp);
     fx = reshape(fx,[5 size(Bdata)]);
@@ -786,14 +785,14 @@ if ismember('calcium',doanalysis)
         end
     end
     k34data = reshape(k34data,[length(k4test) length(k3test)]);
-    putvar('-file',filename,'k34data');
+    h5writestruct(filename,k34data,'rootgroup','calcium');
     
     par.k30 = k30;
     par.k40 = k40;
 end
 
 if ismember('calcium',doplot)
-    getvar('-file',filename,'k34data');
+    k34data = h5readstruct(filename,'rootgroup','calcium');
     figureseries('Calcium dynamics effect');
     fx = cat(3,k34data.fexp);
     fx = reshape(fx,[5 size(k34data)]);
