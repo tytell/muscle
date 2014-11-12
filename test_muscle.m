@@ -3,11 +3,11 @@ function test_muscle
 %optimized parameters:
 %2: m = 0.0542; b = 0.2802; lc0 = 0.9678; k1 = 6.7281; k2 = 23.2794; k30 = 51.3537; k40 = 19.3801; km1 = 17.5804; km2 = 6.0156    ->> sum(dx^2) = 6.056118
 
-filename = 'test_muscle.mat';
+filename = 'test_muscle.h5';
 nlfilename = 'test_muscle_nonlin.mat';
 quiet = true;
-doanalysis = {'duty'};
-doplot = {'duty'};
+doanalysis = {'phase'};
+doplot = {'phase','pert','dev','length','nonlin','damping','calcium'};
 
 par.L0 = 2.94;                  % mm
 par.Lis = 2.7;                  % mm
@@ -90,11 +90,11 @@ if (ismember('phase',doanalysis))
         
         progress(i);
     end
-    putvar('-file',filename,'data');
+    h5writestruct(filename,data,'rootgroup','phase');
 end
 
 if ismember('phase',doplot)
-    getvar('-file',filename,'data');
+    data = h5readstruct(filename,'rootgroup','phase');
     
     Pcall = cat(2,data.Pc);
 
@@ -265,8 +265,8 @@ if (ismember('pert',doanalysis))
         pertdata(i,j).Pc = Pc1;
         progress(j);
     end
-    
-    putvar('-file',filename,'pertdata');
+
+    h5writestruct(filename,data,'rootgroup','pert');
 end
 
 if ismember('pert',doplot)
