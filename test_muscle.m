@@ -4,10 +4,9 @@ function test_muscle
 %2: m = 0.0542; b = 0.2802; lc0 = 0.9678; k1 = 6.7281; k2 = 23.2794; k30 = 51.3537; k40 = 19.3801; km1 = 17.5804; km2 = 6.0156    ->> sum(dx^2) = 6.056118
 
 filename = 'test_muscle.h5';
-nlfilename = 'test_muscle_nonlin.mat';
 quiet = true;
-doanalysis = {}; %{'phase'};
-doplot = {'phase','pert','dev','length','nonlin','damping','calcium'};
+doanalysis = {'phase','pert','dev','length','nonlin','damping','calcium'};
+doplot = {}; %{'phase','pert','dev','length','nonlin','damping','calcium'};
 
 par.L0 = 2.94;                  % mm
 par.Lis = 2.7;                  % mm
@@ -52,6 +51,9 @@ dt = 0.005;
 phitest = 0:0.05:0.95;
 showphi = [1 6 11 17];
 
+dt = 0.005;
+t0 = (0:dt:par.T)';
+
 nd = 5;
 
 pertmag = 0.1;
@@ -61,9 +63,9 @@ if (ismember('phase',doanalysis))
     z = zeros(n,1);
     z5 = zeros(n,5);
     
-    data = struct('t',z, 'x',z, 'xp',z, 'sol',struct([]), ...
+    data = struct('t',z, 'x',z5, 'xp',z5, 'sol',struct([]), ...
         'per',par.T, 'fcn',@(t,x) odefcn(t,x,par), ...
-        'phi',0,'L',[],'V',[], 'lc',z, 'vc',z, 'Pc',z, ...
+        'phi',0,'L',z,'V',z, 'L1',0, 'A',0, 'T',0, 'lc',z, 'vc',z, 'Pc',z, ...
         'jfcn',@(t,x) jfcn(t,x,par), 'fx',zeros(n,5,5), 'fexp',zeros(5,1), ...
         'fmode',zeros(n,5,5));
     data = repmat(data,[1 length(phitest)]);
@@ -84,8 +86,8 @@ if (ismember('phase',doanalysis))
         data1.L1 = par.L1;
         data1.A = par.A;
         data1.T = par.T;
-        data1.lc = data1.L(data1.t) - data1.x(:,1);
-        data1.vc = data1.V(data1.t) - data1.x(:,2);
+        data1.lc = data1.L - data1.x(:,1);
+        data1.vc = data1.V - data1.x(:,2);
         data1.Pc = Pc(data1.lc, data1.vc, data1.x(:,4), par);
         
         data1 = get_floquet(data1,@(t,x) jfcn(t,x,par), 100);
@@ -216,6 +218,8 @@ if ismember('phase',doplot)
 end
 
 if (ismember('pert',doanalysis))
+    data = h5readstruct(filename,'rootgroup','phase');
+    
     i = 3;
     t0 = data(i).t;
     xbase = data(i).x;
@@ -237,8 +241,8 @@ if (ismember('pert',doanalysis))
     progress(0,length(phipert),'**** Perturbation test');
     pertdata = struct([]);
     odeopt = odeset('RelTol',1e-6);
-    for j = 1:length(phipert)
-        a = find(t >= phipert(j),1);
+    for j = 1:2 %length(phipert)
+        a = find(t0 >= phipert(j),1);
 
         xinit = xbase(a,:) + pertval(j,:);
         sol = ode45(@(t,x) odefcn(t,x,par), t0(a) + [0 par.T], xinit', odeopt);
@@ -263,6 +267,8 @@ if (ismember('pert',doanalysis))
         pertdata(i,j).t = t0;
         pertdata(i,j).x = x1;
         pertdata(i,j).xinit = xinit;
+        pertdata(i,j).L = par.L(t0);
+        pertdata(i,j).L = par.L(t1);
         pertdata(i,j).lc = lc1;
         pertdata(i,j).vc = vc1;
         pertdata(i,j).Pc = Pc1;
@@ -322,15 +328,34 @@ if ismember('pert',doplot)
 end
 
 if (ismember('dev',doanalysis))
+    data = h5readstruct(filename,'rootgroup','phase');
     devdata = struct([]);
+    
+    fxx = cat(4, data.fx);
     
     figureseries('Test');
     clf;
     
-    Pcdevall = zeros(length(t),length(phitest),length(phitest));
+    Pcdevall = zeros(length(t0),length(phitest),length(phitest));
     W0 = zeros(length(phitest),1);
     Wdev = zeros(length(phitest),length(phitest));
     
+    info = h5info(filename);
+    if ~isempty(info.Datasets)
+        existsets = {info.Datasets.Name};
+    else
+        existsets = {};
+    end
+    if ~ismember('Pcdevall',existsets)
+        h5create(filename,'/Pcdevall',size(Pcdevall));
+    end
+    if ~ismember('W0',existsets)
+        h5create(filename,'/W0',size(W0));
+    end
+    if ~ismember('Wdev',existsets)
+        h5create(filename,'/Wdev',size(Wdev));
+    end
+
     n = 1;
     N = length(data) * length(phitest);
     progress(0,N, '**** Computing deviations...');
@@ -342,17 +367,17 @@ if (ismember('dev',doanalysis))
         lcbase = data(i).lc;
         vcbase = data(i).vc;
 
-        par.L = data(i).L;
-        par.V = data(i).V;
+        par.L = @(t) data(i).L1 + data(i).A * cos(2*pi/data(i).T * (t - data(i).phi));
+        par.V = @(t) -2*pi/data(i).T * data(i).A * sin(2*pi/data(i).T * (t - data(i).phi));
         
-        W0(i) = trapz(-data(i).L(t0), Pcbase);
+        W0(i) = trapz(-data(i).L, Pcbase);
         % plot(-data(i).L(t), Pcbase, 'k-');
         % fprintf('Total work at phase %g = %g\n', phitest(i), W0(i));
 
         dec = exp(data(i).fexp(1)*data(i).t);
         for j = 1:length(phitest),
-            a = find(t >= phitest(j),1);
-            k = [a:length(t) 1:a-1]';
+            a = find(t0 >= phitest(j),1);
+            k = [a:length(t0) 1:a-1]';
             dec1 = zeros(size(dec));
             dec1(k) = dec;
 
@@ -363,7 +388,7 @@ if (ismember('dev',doanalysis))
             xfx1 = xbase + 0.2*dev1;
             Pcdevall(:,i,j) = Pc(par.L(t0)-xfx1(:,1),par.V(t0)-xfx1(:,2),xfx1(:,4), par);
 
-            Wdev(i,j) = trapz(-data(i).L(t), Pcdevall(:,i,j));
+            Wdev(i,j) = trapz(-data(i).L, Pcdevall(:,i,j));
             %addplot(-data(i).L(t), Pcdevall(:,i,j), 'r-');
             %drawnow;
             
@@ -381,10 +406,10 @@ if (ismember('dev',doanalysis))
                 vc1 = par.V(t1) - x1(:,2);
                 Pc1 = Pc(lc1,vc1, x1(:,4), par);
             else
-                x1 = [];
-                lc1 = [];
-                vc1 = [];
-                Pc1 = [];
+                x1 = NaN(length(t0),5);
+                lc1 = NaN(length(t0),1);
+                vc1 = NaN(length(t0),1);
+                Pc1 = NaN(length(t0),1);
             end
 
             devdata(i,j).phipert = phitest(j);
@@ -395,6 +420,8 @@ if (ismember('dev',doanalysis))
             devdata(i,j).t = t0;
             devdata(i,j).x = x1;
             devdata(i,j).xfx = xfx1;
+            devdata(i,j).L = par.L(t1);
+            devdata(i,j).V = par.V(t1);
             devdata(i,j).lc = lc1;
             devdata(i,j).vc = vc1;
             devdata(i,j).Pc = Pc1;
@@ -404,11 +431,8 @@ if (ismember('dev',doanalysis))
             progress(n);
         end
         h5writestruct(filename,devdata,'rootgroup','dev');
-        h5create(filename,'/Pcdevall',size(Pcdevall));
         h5write(filename,'/Pcdevall',Pcdevall);
-        h5create(filename,'/W0',size(W0));
         h5write(filename,'/W0',W0);
-        h5create(filename,'/Wdev',size(Wdev));
         h5write(filename,'/Wdev',Wdev);
     end
 end
@@ -498,8 +522,8 @@ if (ismember('length',doanalysis))
             data1.Pc = Pc(data1.lc, data1.vc, data1.x(:,4), par);
 
             data1 = get_floquet(data1,@(t,x) jfcn(t,x,par), 100);
-            data1.L = par.L;
-            data1.V = par.V;
+            data1.L = par.L(data1.t);
+            data1.V = par.V(data1.t);
             L1data = makestructarray(L1data,data1);
             n = n+1;
             progress(n);
@@ -557,8 +581,11 @@ nldone = false;
 if (ismember('nonlin',doanalysis))
     par0 = par;
     
+    NLdata = struct([]);
+    n = 0;
+    
     progress(0,N, '**** Nonlinear calculations');
-    for i = i0:length(islen)
+    for i = 1:length(islen)
         if (islen(i))
             par.lambda2 = par0.lambda2;
         else
@@ -603,7 +630,8 @@ if (ismember('nonlin',doanalysis))
             data1.Pc = Pc(data1.lc, data1.vc, data1.x(:,4), par);
 
             data1 = get_floquet(data1,@(t,x) jfcn(t,x, par), 100);
-            data1.L = par.L;
+            data1.L = par.L(data1.t);
+            data1.V = par.V(data1.t);
             data1.islen = islen(i);
             data1.isvel = isvel(i);
             data1.iswork = iswork(i);
@@ -731,7 +759,8 @@ if ismember('damping',doanalysis)
 
             data1 = get_floquet(data1,@(t,x) jfcn(t,x, par), 100);
             
-            data1.L = par.L;
+            data1.L = par.L(data1.t);
+            data1.V = par.V(data1.t);
             data1.b = par.b;
             Bdata = makestructarray(Bdata,data1);
         end
@@ -778,7 +807,8 @@ if ismember('calcium',doanalysis)
             data1.Pc = Pc(data1.lc, data1.vc, data1.x(:,4), par);
 
             data1 = get_floquet(data1,@(t,x) jfcn(t,x, par), 100);
-            data1.L = par.L;
+            data1.L = par.L(data1.t);
+            data1.V = par.V(data1.t);
             data1.k30 = par.k30;
             data1.k40 = par.k40;
             k34data = makestructarray(k34data,data1);
@@ -833,8 +863,6 @@ if ismember('duty',doanalysis)
     h5create(dutyfile,'/k4',size(k4vals2));
     h5write(dutyfile,'/k4',k4vals2);
     
-    dt = 0.005;
-    t0 = (0:dt:par.T)';
     nt = length(t0);
     nfourier = 150;
     
@@ -915,10 +943,6 @@ if ismember('duty',doanalysis)
     end
 end
 
-if ismember('duty',doplot)
-    %TODO: Merge dutydata files
-    getvar('-file',filename,'dutydata');
-end    
 
 %--------------------------------------------------------
 function [hx,dhx] = h(x, par)
