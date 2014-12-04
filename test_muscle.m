@@ -5,8 +5,8 @@ function test_muscle
 
 filename = 'test_muscle.h5';
 quiet = true;
-doanalysis = {'phase','pert','dev','length','nonlin','damping','calcium'};
-doplot = {}; %{'phase','pert','dev','length','nonlin','damping','calcium'};
+doanalysis = {'nonlin','damping','calcium'};
+doplot = {'length','nonlin','damping','calcium'};
 
 par.L0 = 2.94;                  % mm
 par.Lis = 2.7;                  % mm
@@ -57,7 +57,25 @@ t0 = (0:dt:par.T)';
 nd = 5;
 
 pertmag = 0.1;
+
+if ismember('init',doplot)
+    tinit = [0 15*par.T];
+    odeopt = odeset('RelTol',1e-6); %, 'OutputFcn', @odeplot);
     
+    phi1 = 0.1;
+    
+    par.L = @(t) par.L1 + par.A * cos(2*pi/par.T * (t - phi1));
+    par.V = @(t) -2*pi/par.T * par.A * sin(2*pi/par.T * (t - phi1));
+    X0 = [0   0   0   0   1];
+    [t,x] = ode45(@(t,x) odefcn(t,x,par), tinit, X0, odeopt);
+
+    lc1 = par.L(t) - x(:,1);
+    vc1 = par.V(t) - x(:,2);
+    Pc1 = Pc(lc1, vc1, x(:,4), par);
+    
+    plot(t,Pc1);
+end
+
 if (ismember('phase',doanalysis))
     n = par.T / dt + 1;
     z = zeros(n,1);
@@ -201,8 +219,6 @@ if ismember('phase',doplot)
     xlabel('Time (s)');
     print('-dpdf','FloquetExp.pdf');
 
-
-
     figureseries('Deviation from steady vs. phi');
     clf;
     for i = 1:4,
@@ -241,7 +257,7 @@ if (ismember('pert',doanalysis))
     progress(0,length(phipert),'**** Perturbation test');
     pertdata = struct([]);
     odeopt = odeset('RelTol',1e-6);
-    for j = 1:2 %length(phipert)
+    for j = 1:length(phipert)
         a = find(t0 >= phipert(j),1);
 
         xinit = xbase(a,:) + pertval(j,:);
@@ -275,7 +291,7 @@ if (ismember('pert',doanalysis))
         progress(j);
     end
 
-    h5writestruct(filename,data,'rootgroup','pert');
+    h5writestruct(filename,pertdata,'rootgroup','pert');
 end
 
 if ismember('pert',doplot)
@@ -438,10 +454,11 @@ if (ismember('dev',doanalysis))
 end
 
 if ismember('dev',doplot)
+    data = h5readstruct(filename,'rootgroup','phase');
     devdata = h5readstruct(filename,'rootgroup','dev');
     Pcdevall = h5read(filename,'/Pcdevall');
-    W0 = h5read(filename,'/Pcdevall');
-    Wdev = h5read(filename,'/Pcdevall');
+    W0 = h5read(filename,'/W0');
+    Wdev = h5read(filename,'/Wdev');
     
     figureseries('Check Floquet');
     clf;
@@ -538,6 +555,7 @@ end
 if ismember('length',doplot)
     L1data = h5readstruct(filename,'rootgroup','length');
     
+    t = L1data(1).t;
     lcall = cat(2,L1data.lc);
     lcall = reshape(lcall,[],3,length(phitest2));
 
@@ -1029,7 +1047,7 @@ dls = vs;
 
 muval = mu(Caf, par);
 
-dvs = 1/par.mm * (Pcval - par.b*vs - muval.*ls);
+dvs = 1/par.mm * (Pcval + par.b*vc - muval.*ls);
 
 dx = [dls; dvs; dCa; dCaf; dm];
 

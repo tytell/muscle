@@ -3,9 +3,9 @@ function test_two_muscles
 %optimized parameters:
 %2: m = 0.0542; b = 0.2802; lc0 = 0.9678; k1 = 6.7281; k2 = 23.2794; k30 = 51.3537; k40 = 19.3801; km1 = 17.5804; km2 = 6.0156    ->> sum(dx^2) = 6.056118
 
-filename = 'test_two_muscles.mat';
+filename = 'test_two_muscles.h5';
 quiet = true;
-doanalysis = {'duty','nonlin'};
+doanalysis = {'freq','damping','duty','nonlin'};
 doplot = {};
 
 par.L0 = 2.94;                  % mm
@@ -142,11 +142,13 @@ if ismember('freq',doanalysis)
         
         progress(i);
     end
-    
-    putvar('-file',filename,'freqdata');
+
+    h5writestruct(filename,freqdata,'rootgroup','freq');
 end
 
 if ismember('freq',doplot)
+    freqdata = h5readstruct(filename,'rootgroup','freq');
+    
     figureseries('Time series res freq');
     clf;
     xx = [0 par.duty par.duty 0; 0.5 par.duty+0.5 par.duty+0.5 0.5]';
@@ -290,7 +292,7 @@ if ismember('damping',doanalysis)
     
     a = 1;
     n = length(omegarvals) * length(zetavals);
-    progress(0,n, '**** Daming test');
+    progress(0,n, '**** Damping test');
     for j = 1:length(zetavals)
         par.zeta = zetavals(j);
         for i = 1:length(omegarvals)
@@ -314,7 +316,8 @@ if ismember('damping',doanalysis)
             progress(a);
         end
     end
-    putvar('-file',filename,'dampdata');    
+    
+    h5writestruct(filename,dampdata,'rootgroup','damping');
 end
 
 if ismember('damping',doplot)
@@ -849,11 +852,11 @@ dls = vs;
 
 muval = mu(Caf, par);
 
-dvs = 1/par.mm * (Pcval - par.b*vs - muval.*ls);
+dvs = 1/par.mm * (Pcval + par.b*vc - muval.*ls);
 
 dL = V;
-dV = 1/par.M * (-muval(1,:) .* ls(1,:) + par.b * vs(1,:) + ...
-             muval(2,:) .* ls(2,:) - par.b * vs(2,:) ...
+dV = 1/par.M * (-muval(1,:) .* ls(1,:) + ...
+             muval(2,:) .* ls(2,:) ...
              - 2 * par.zeta * par.omegar * V - par.omegar^2 * L);
 
 dx = [dls(1,:); dvs(1,:); dCa(1,:); dCaf(1,:); dm(1,:); ...
@@ -935,15 +938,15 @@ J(11:12,11:12) = [0, 1; ...
     -par.omegar^2/par.M, -2*par.zeta*par.omegar/par.M];
 
 %coupling between muscles and spring mass
-J(12,1:10) = [1/par.M .* (-par.mu0 - Caf(1) .* par.mu1),   par.b/par.M, ...
+J(12,1:10) = [1/par.M .* (-par.mu0 - Caf(1) .* par.mu1),   0, ...
     0, -par.mu1 .* ls(1) ./ par.M, 0, ...
-    1/par.M .* (par.mu0 + Caf(2) .* par.mu1),   -par.b/par.M, ...
+    1/par.M .* (par.mu0 + Caf(2) .* par.mu1),   0, ...
     0, -par.mu1 .* ls(2) ./ par.M, 0];
 
 Jcouple = [zero, zero; ...
     ...
     Caf.*alphaval.*dlambdaval / par.mm,   ...
-    Caf.*lambdaval.*dalphaval / par.mm; ...
+    (par.b + Caf.*lambdaval.*dalphaval) / par.mm; ...
     ...
     zero, zero; ...
     ...
@@ -955,6 +958,7 @@ Jcouple = [zero, zero; ...
 
 J(1:5,11:12) = Jcouple(:,:,1);
 J(6:10,11:12) = Jcouple(:,:,2);
+J(7,12) = -J(7,12);
 
     
 

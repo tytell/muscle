@@ -99,6 +99,13 @@ solnew = ode45(@(t,x) muscle_ode_fcn(t,x,par), [0 t0(end)+1], X0, odeopt);
 xnew = deval(solnew,t2);
 [~,lcn,vcn,Pcn] = muscle_ode_fcn(t2',xnew,par);
 
+par.model = 'ls2';
+odeopt = odeset('RelTol',1e-5); %, 'OutputFcn',@odeplot);
+solnew = ode45(@(t,x) muscle_ode_fcn(t,x,par), [0 t0(end)+1], X0, odeopt);
+
+xnew2 = deval(solnew,t2);
+[~,lcn2,vcn2,Pcn2] = muscle_ode_fcn(t2',xnew2,par);
+
 par.L = @(t) par.L1 + A1 * cos(2*pi * (t - phi1));
 par.model = 'old2';
 solold = ode45(@(t,x) muscle_ode_fcn(t,x,par), [0 t0(end)+1], X0, odeopt);
@@ -111,6 +118,11 @@ lcn = lcn';
 vcn = vcn';
 Pcn = Pcn';
 
+xnew2 = xnew2';
+lcn2 = lcn2';
+vcn2 = vcn2';
+Pcn2 = Pcn2';
+
 xold = xold';
 lco = lco';
 vco = vco';
@@ -118,11 +130,11 @@ Pco = Pco';
 
 figureseries('0.2 comparison');
 subplot(2,1,1);
-plot(t2,Pcn, t2,Pco, musc.tmod,musc.Fmod(:,3)/par.P0, musc.tdata,musc.Fdata(:,3)/par.P0);
-legend('new','old','Thelma','data');
+plot(t2,Pcn2, t2,Pcn, t2,Pco, musc.tmod,musc.Fmod(:,3)/par.P0, musc.tdata,musc.Fdata(:,3)/par.P0);
+legend('reallynew','new','old','Thelma','data');
 
 subplot(2,1,2);
-plot(t2,vcn, t2,vco);
+plot(t2,vcn2, t2,vcn, t2,vco);
 
 load fit_muscle.mat
 if (~exist('dx0','var') || any(all(flatten(~isnan(dx0),2:4))) || ...
@@ -170,7 +182,7 @@ if (~exist('dx0','var') || any(all(flatten(~isnan(dx0),2:4))) || ...
     save fit_muscle.mat dx0 Pcmod0 data0;
     
     tic;
-    par.model = 'ls';
+    par.model = 'ls2';
     parfor k = 1:length(ii)
         i = ii(k);
         j = jj(k);
@@ -227,7 +239,7 @@ ytick(log10(mtest), cellfun(@num2str,num2cell(mtest),'UniformOutput',false));
 xlabel('B');
 ylabel('m');
 colorbar;
-title('ls model');
+title('ls2 model');
 caxis auto;
 
 [~,ind1] = min(flatten(lsq(:,:,1)));
@@ -252,16 +264,16 @@ end
 %m = 0.061635; b = 0.211072; lc0 = 0.969523    ->> sum(dx^2) = 0.001688
 %(optimizing just the peak values)
 
-param0 = [mtest(i2); btest(j2); par.lc0; par.k1; par.k2;...
+param0 = [0.061635; 0.211072; 0.969523; par.k1; par.k2;...
           par.k30; par.k40; par.km1; par.km2];
 if inputyn('Run optimization again?', 'default',false)
     i2 = 2;
     j2 = 4;
-    fprintf('Start at m = %f, b = %f\n', mtest(i2),btest(j2));
+    fprintf('Start at m = %f, b = %f\n', param0(1),param0(2));
     optopt = optimset('Display','iter-detailed','FunValCheck','on', ...
         'UseParallel','always', 'DiffMinChange',0.1);
     %par.phi = par.phi(3);
-    par.model = 'ls';
+    par.model = 'ls2';
 
     [param,resnorm,residual,exitflag,output] = ...
         lsqnonlin(@(p) fit_muscle_fcn(p,@muscle_ode_fcn,par), param0, [], [], optopt);

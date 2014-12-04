@@ -3,11 +3,10 @@ function test_muscle_mass
 %optimized parameters:
 %2: m = 0.0542; b = 0.2802; lc0 = 0.9678; k1 = 6.7281; k2 = 23.2794; k30 = 51.3537; k40 = 19.3801; km1 = 17.5804; km2 = 6.0156    ->> sum(dx^2) = 6.056118
 
-filename = 'test_muscle_mass.mat';
-F = load(filename);
+filename = 'test_muscle_mass.h5';
 
-quiet = true;
-doplot = {'duty','nonlin'};
+doplot = {'base','resfreq','damping','duty','nonlin'};
+doanalysis = {'freq','damping','duty','nonlin'};
 
 par.L0 = 2.94;                  % mm
 par.Lis = 2.7;                  % mm
@@ -104,7 +103,7 @@ end
 omegarvals = 2*pi* ([0.3:0.05:1 1.2 1.5 2]);
 showfreq = [1 7 15 18];
 
-if (~isfield(F,'freqdata') || (~quiet && ~inputyn('Use existing frequency data?', 'default',true)))
+if (ismember('freq',doanalysis))
     freqdata = struct([]);
     
     progress(0,length(omegarvals),'**** Omegar test');
@@ -128,13 +127,11 @@ if (~isfield(F,'freqdata') || (~quiet && ~inputyn('Use existing frequency data?'
         
         progress(i);
     end
-    
-    F.freqdata = freqdata;
-    save(filename,'-struct','F','freqdata','-append','v7.3');
+    h5writestruct(filename,freqdata,'rootgroup','freq');
 end
 
 if ismember('resfreq',doplot)
-    freqdata = F.freqdata;
+    freqdata = h5readstruct(filename,'rootgroup','freq');;
     
     figureseries('Res freq');
     xx = cat(3, freqdata.x);
@@ -194,7 +191,7 @@ omegarold = omegarvals;
 zetavals = [0.2 1 2 4];
 omegarvals = 2*pi* ([0.3 0.5 0.8 1 1.2 1.5 2]);
 
-if (~isfield(F,'dampdata') || (~quiet && ~inputyn('Use existing damping data?', 'default',true)))
+if (ismember('damping',doanalysis))
     dampdata = struct([]);
     
     X0 = [0   0   0   0    1    ...
@@ -224,12 +221,12 @@ if (~isfield(F,'dampdata') || (~quiet && ~inputyn('Use existing damping data?', 
             progress(a);
         end
     end
-    F.dampdata = dampdata;
-    save(filename,'-struct','F','dampdata','-append','v7.3');
+    h5writestruct(filename,dampdata,'rootgroup','damping');
 end
 
 if ismember('damping',doplot)
-    dampdata = F.dampdata;
+    dampdata = h5readstruct(filename,'rootgroup','damping');
+
     isomega = ismember(omegarold,omegarvals);
     islowzeta = zetavals < zetaold;
 
@@ -259,8 +256,7 @@ zetavals = [0.2 1 2];
 omegarvals = 2*pi* ([0.5 0.8 1 1.2 1.5 2]);
 dutyvals = [0.1 0.2 0.36 0.4 0.5 0.55];
 n = length(omegarvals) * length(zetavals) * length(dutyvals);
-if (~isfield(F,'dutydata') || ...
-        (numel(F.dutydata) ~= n) || (~quiet && ~inputyn('Use existing duty cycle data?', 'default',true)))
+if (ismember('duty',doanalysis))
     dutydata = struct([]);
     
     X0 = [0   0   0   0    1    ...
@@ -296,12 +292,12 @@ if (~isfield(F,'dutydata') || ...
             end
         end
     end
-    F.dutydata = dutydata;
-    save(filename,'-struct','F','dutydata','-append','v7.3');
+    
+    h5writestruct(filename,dutydata,'rootgroup','duty');
 end
 
 if ismember('duty',doplot)
-    dutydata = F.dutydata;
+    dutydata = h5readstruct(filename,'rootgroup','duty');
     
     fexp = cat(2,dutydata.fexp);
     fexp = reshape(fexp,[size(fexp,1) length(omegarvals) length(zetavals) length(dutyvals)]);
@@ -345,7 +341,7 @@ stiffval = vals(:,4);
 dutyvals = [0.1 0.36 0.4 0.5];
 N = length(islen) * length(dutyvals);
 
-if (~isfield(F,'NLdata') || (~quiet && ~inputyn('Use existing data?', 'default',true)))
+if (ismember('nonlin',doanalysis))
     par0 = par;
     
     progress(0,N, '**** Nonlinear calculations');
@@ -409,13 +405,12 @@ if (~isfield(F,'NLdata') || (~quiet && ~inputyn('Use existing data?', 'default',
         end
     end
 
-    F.NLdata = NLdata;
-    save(filename,'-struct','F','NLdata','-append','v7.3');
+    h5writestruct(filename,NLdata,'rootgroup','nonlin');
     par = par0;
 end
 
 if ismember('nonlin',doplot)
-    NLdata = F.NLdata;
+    NLdata = h5readstruct(filename,'rootgroup','nonlin');
     
     figureseries('Floquet exp vs nonlin');
     clf;
@@ -594,10 +589,10 @@ dls = vs;
 
 muval = mu(Caf, par);
 
-dvs = 1/par.mm * (Pcval - par.b*vs - muval.*ls);
+dvs = 1/par.mm * (Pcval + par.b*vc - muval.*ls);
 
 dL = V;
-dV = 1/par.M * (-muval(1,:) .* ls(1,:) + par.b * vs(1,:) + ...
+dV = 1/par.M * (-muval(1,:) .* ls(1,:) ...
              - 2 * par.zeta * par.omegar * V - par.omegar^2 * L);
 
 dx = [dls; dvs; dCa; dCaf; dm; dL; dV];
@@ -664,15 +659,15 @@ J(1:5,1:5) = Jmusc(:,:,1);
 
 %spring mass evolution
 J(6:7,6:7) = [0, 1; ...
-    -par.omegar^2/par.M, -2*par.omegar*par.zeta/par.M];
+    -par.omegar^2/par.M, - 2*par.omegar*par.zeta/par.M];
 
 %coupling between muscle and mass
-J(7,1:5) = [(-par.mu0-Caf.*par.mu1)/par.M, par.b/par.M, 0, -par.mu1.*ls/par.M, 0];
+J(7,1:5) = [(-par.mu0-Caf.*par.mu1)/par.M, 0, 0, -par.mu1.*ls/par.M, 0];
 J(1:5,6:7) = [...
     0, 0; ...
     ...
     1/par.mm * Caf .* alphaval .* dlambdaval, ...
-    1/par.mm * Caf .* lambdaval .* dalphaval; ...
+    1/par.mm * (par.b + Caf .* lambdaval .* dalphaval); ...
     ...
     0, 0; ...
     0, 0; ...

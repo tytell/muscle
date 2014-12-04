@@ -70,6 +70,41 @@ switch par.model
         
         dx = [dls; dvs; dCa; dCaf; dm];
         
+    case 'ls2'
+        ls = x(1,:);
+        vs = x(2,:);
+        Ca = x(3,:);
+        Caf = x(4,:);
+        m = x(5,:);
+        
+        actval = par.act(t);
+        Lval = par.L(t);
+        Vval = par.V(t);
+        
+        lc = Lval - ls;
+        vc = Vval - vs;
+        
+        gact = actval; %g(actval);
+
+        Pcval = Pc(lc,vc,Caf, par);
+        
+        dm = par.km1*Pcval.*h(-vc, par) - par.km2*(m-1).*g(vc+0.5, par);
+        
+        k3 = par.k30 ./ sqrt(m);
+        k4 = par.k40 .* sqrt(m);
+        
+        dCaf = (k3 .* Ca - k4 .* Caf) .* (1 - Caf);
+        dCa = (k4 .* Caf - k3 .* Ca) .* (1 - Caf) + ...
+            gact .* par.k1 .* (par.C - Ca - Caf) + ...
+            (1 - gact) .* par.k2 .* Ca .* (par.C - par.S - Ca - Caf);
+        dls = vs;
+        
+        muval = mu(Caf, par);
+        
+        dvs = 1/par.mm * (Pcval + par.b*vc - muval.*ls);
+        
+        dx = [dls; dvs; dCa; dCaf; dm];
+
     case 'old'
         
         P = x(1,:);

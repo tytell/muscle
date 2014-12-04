@@ -28,7 +28,7 @@ for i = 1:length(phitest1)
     switch par.model
         case 'lc'
             X0 = [par.L1+A1   0   0   0   1];
-        case 'ls'
+        case {'ls','ls2'}
             X0 = [0   0   0   0   1];
         case {'old','old2'}
             X0 = [0   0   0   0   1];
