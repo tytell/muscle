@@ -5,8 +5,8 @@ function test_muscle
 
 filename = 'test_muscle.h5';
 quiet = true;
-doanalysis = {'nonlin','damping','calcium'};
-doplot = {'length','nonlin','damping','calcium'};
+doanalysis = {};
+doplot = {'pert','nonlin','damping','calcium'}; %{'init','phase','pert','dev','length','nonlin','damping','calcium'};
 
 par.L0 = 2.94;                  % mm
 par.Lis = 2.7;                  % mm
@@ -559,32 +559,37 @@ if ismember('length',doplot)
     lcall = cat(2,L1data.lc);
     lcall = reshape(lcall,[],3,length(phitest2));
 
+    col = get(groot,'defaultAxesColorOrder');
+    
     figureseries('Length effect');
     clf;
     subplot(2,2,1);
     lc1 = 0.7*par.lc0:0.01:1.3*par.lc0;
     plot(lc1, lambda(lc1, par), 'k--');
-    addplot(squeeze(lcall(:,1,:)), squeeze(lambda(lcall(:,1,:),par)),'b-', ...
-        squeeze(lcall(:,2,:)), squeeze(lambda(lcall(:,2,:),par)),'g-', ...
-        squeeze(lcall(:,3,:)), squeeze(lambda(lcall(:,3,:),par)),'r-', ...
-        'LineWidth',2);
+    addplot(squeeze(lcall(:,1,:)), squeeze(lambda(lcall(:,1,:),par)),'Color',col(1,:),'LineWidth',2);
+    addplot(squeeze(lcall(:,2,:)), squeeze(lambda(lcall(:,2,:),par)),'-', 'Color',col(2,:),'LineWidth',2);
+    addplot(squeeze(lcall(:,3,:)), squeeze(lambda(lcall(:,3,:),par)),'-', 'Color',col(3,:),'LineWidth',2);
     axis tight;
     xlabel('lc');
     ylabel('\lambda');
 
     subplot(2,2,2);
-    plot(t, squeeze(lcall(:,1,:)),'b-', ...
-        t, squeeze(lcall(:,2,:)),'g-', ...
-        t, squeeze(lcall(:,3,:)),'r-');
+    plot(t, squeeze(lcall(:,1,:)),'Color',col(1,:));
+    addplot(t, squeeze(lcall(:,2,:)),'g-', 'Color',col(2,:));
+    addplot(t, squeeze(lcall(:,3,:)),'r-', 'Color',col(3,:));
     xlabel('Time (s)');
     ylabel('lc');
 
     subplot(2,1,2);
-    fx = cat(3,L1data.fexp);
-    fx = reshape(fx,[5 size(L1data)]);
-    plot(phitest2,squeeze(fx(1,:,:)),'o-');
+    fexp = cat(3,L1data.fexp);
+    fexp = reshape(fexp,[5 size(L1data)]);
+    plot(phitest2,log(0.5) ./ real(squeeze(fexp(1,:,:))),'o-');
+    
+    lab = cellfun(@(x) num2str(diground(x,0.001)),num2cell(L1test),'UniformOutput',false);
+    labellines(lab);
+    
     xlabel('Activation phase');
-    ylabel('Mode 1 exponent');
+    ylabel('Mode 1 time constant (sec)');
     print('-dpdf','LengthEffect.pdf');
 end
 
@@ -671,9 +676,8 @@ if ismember('nonlin',doplot)
 
     figureseries('Floquet exp vs nonlin');
     clf;
-    subplot(2,3,6);
-    fx = cat(3,NLdata.fexp);
-    fx = reshape(fx,[5 size(NLdata)]);
+    fexp = cat(3,NLdata.fexp);
+    fexp = reshape(fexp,[5 size(NLdata)]);
 
     clf;
     yl = [Inf -Inf];
@@ -694,7 +698,7 @@ if ismember('nonlin',doplot)
                 ttl = 'all';
         end
         hax(i) = subplot(2,2,i);
-        plot(phitest2, squeeze(real(fx(1,:,good))));
+        plot(phitest2, squeeze(real(fexp(1,:,good))));
         xlabel('Activation phase');
         ylabel('Mode 1 exponent');
         title(ttl);
@@ -712,11 +716,56 @@ if ismember('nonlin',doplot)
     set(hax,'YLim',yl);
     print('-dpdf','FloquetExpVsNonLin.pdf');
 
+    leg = cell(length(islen),1);
+    for i = 1:length(islen)
+        leg{i} = '0000';
+        if isvel(i)
+            leg{i}(1) = 'V';
+        end
+        if islen(i)
+            leg{i}(2) = 'L';
+        end
+        if iswork(i)
+            leg{i}(3) = 'W';
+        end
+        if stiffval(i) == 2
+            leg{i}(4) = 'S';
+        elseif stiffval(i) == 3
+            leg{i}(4) = '$';
+        end
+    end
+            
+    figureseries('Floquet exp vs nonlin2');
+    clf;
 
+    fexpmn = nanmean(fexp(1,:,:),2);
+    fexpmn = reshape(fexpmn,4,2,3);
+    fexpmn = permute(fexpmn,[1 3 2]);
+    fexpmn = reshape(fexpmn,4,6)';
+    
+    leg1 = reshape(leg,4,2,3);
+    leg1 = permute(leg1,[1 3 2]);
+    leg1 = reshape(leg1,4,6)';
+    
+    imagesc(log(0.5) ./ fexpmn);
+    xt = cellfun(@(x) (x(1:2)), leg1(1,:), 'UniformOutput',false);
+    yt = cellfun(@(x) (x(3:4)), leg1(:,1), 'UniformOutput',false);
+    
+    xtick(xt);
+    ytick(yt);
+    title('Mode 1 time constant (sec)');
+    
+    colorbar;
+    
     Pcnl = cat(2,NLdata.Pc);
     Pcnl = reshape(Pcnl, [size(Pcnl,1) size(NLdata)]);
 
+    t = NLdata(1).t;
+
     figureseries('Nonlinearity effect');
+    
+    leg1 = reshape(leg1,[4 6])';
+    
     clf;
     j = 4;
     yl = [Inf -Inf];
@@ -725,25 +774,23 @@ if ismember('nonlin',doplot)
         switch i
             case 1
                 good = ~islen & ~isvel;
-                ttl = 'fl=0, fv=0';
+                ttl = '00';
             case 2
                 good = islen & ~isvel;
-                ttl = 'fv=0';
+                ttl = '0L';
             case 3
                 good = ~islen & isvel;
-                ttl = 'fl=0';
+                ttl = 'V0';
             case 4
                 good = islen & isvel;
-                ttl = 'all';
+                ttl = 'VL';
         end
         hax(i) = subplot(2,2,i);
         plot(t, squeeze(Pcnl(:,j,good)));
+        legend(leg1(:,i));
         xlabel('Time (s)');
         ylabel('Force (mN)');
         title(ttl);
-        if (i == 1)
-            legend('none','stiff=const','work=0','both');
-        end
         yl1 = ylim;
         if (yl1(1) < yl(1))
             yl(1) = yl1(1);
@@ -790,10 +837,13 @@ end
 if ismember('damping',doplot)
     Bdata = h5readstruct(filename,'rootgroup','damping');
     figureseries('Damping effect');
-    fx = cat(3,Bdata.fexp);
-    fx = reshape(fx,[5 size(Bdata)]);
-    plot(Btest,log(0.5) ./ real(squeeze(fx(1,:,:))),'o-');
-
+    fexp = cat(3,Bdata.fexp);
+    fexp = reshape(fexp,[5 size(Bdata)]);
+    
+    Btime = log(0.5) ./ real(squeeze(fexp(1,:,:)));
+    plot(Btest,nanmedian(Btime,2),'ko-');
+    addplot([Btest; Btest],[min(Btime,[],2) max(Btime,[],2)]','k-');
+    
     xlabel('Damping coefficient');
     ylabel('t_{1/2} (sec)');
     title('Mode one time constant vs damping');

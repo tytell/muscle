@@ -5,8 +5,8 @@ function test_muscle_mass
 
 filename = 'test_muscle_mass.h5';
 
-doplot = {'base','resfreq','damping','duty','nonlin'};
-doanalysis = {'freq','damping','duty','nonlin'};
+doplot = {'base','resfreq','damping','duty','nonlin'}; 
+doanalysis = {}; %{'freq','damping','duty','nonlin'};
 
 par.L0 = 2.94;                  % mm
 par.Lis = 2.7;                  % mm
@@ -414,88 +414,115 @@ if ismember('nonlin',doplot)
     
     figureseries('Floquet exp vs nonlin');
     clf;
-    subplot(2,3,6);
-    fx = cat(3,NLdata.fexp);
-    fx = reshape(fx,[size(NLdata(1).fexp,1) size(NLdata)]);
+    fexp = cat(3,NLdata.fexp);
+    fexp = reshape(fexp,[size(NLdata(1).fexp,1) size(NLdata)]);
 
     clf;
-    yl = [Inf -Inf];
-    hax = zeros(4,1);
-    for i = 1:4,
-        switch i
-            case 1
-                good = ~islen & ~isvel;
-                ttl = 'fl=0, fv=0';
-            case 2
-                good = islen & ~isvel;
-                ttl = 'fv=0';
-            case 3
-                good = ~islen & isvel;
-                ttl = 'fl=0';
-            case 4
-                good = islen & isvel;
-                ttl = 'all';
+
+    leg = cell(length(islen),1);
+    for i = 1:length(islen)
+        leg{i} = '0000';
+        if isvel(i)
+            leg{i}(1) = 'V';
         end
-        hax(i) = subplot(2,2,i);
-        plot(phitest2, squeeze(real(fx(1,:,good))));
-        xlabel('Activation phase');
-        ylabel('Mode 1 exponent');
-        title(ttl);
-        if (i == 1)
-            legend('none','stiff=const','work=0','both');
+        if islen(i)
+            leg{i}(2) = 'L';
         end
-        yl1 = ylim;
-        if (yl1(1) < yl(1))
-            yl(1) = yl1(1);
+        if iswork(i)
+            leg{i}(3) = 'W';
         end
-        if (yl1(2) > yl(2))
-            yl(2) = yl1(2);
+        if stiffval(i) == 2
+            leg{i}(4) = 'S';
+        elseif stiffval(i) == 3
+            leg{i}(4) = '$';
         end
     end
-    set(hax,'YLim',yl);
+            
+    figureseries('Floquet exp vs nonlin2');
+    clf;
+
+    fexp1 = squeeze(fexp(1,:,:));
+    fexp1 = reshape(fexp1,length(dutyvals),4,2,3);
+    fexp1 = permute(fexp1,[1 2 4 3]);
+    fexp1 = reshape(fexp1,[],4,6);
+    fexp1 = permute(fexp1,[1 3 2]);
+    
+    leg1 = reshape(leg,4,2,3);
+    leg1 = permute(leg1,[1 3 2]);
+    leg1 = reshape(leg1,4,6)';
+    xt = cellfun(@(x) (x(1:2)), leg1(1,:), 'UniformOutput',false);
+    yt = cellfun(@(x) (x(3:4)), leg1(:,1), 'UniformOutput',false);
+    
+    clear h;
+    
+    cax = [Inf -Inf];
+    for i = 1:4
+        h(i) = subplot(2,2,i);
+        imagesc(log(0.5) ./ squeeze(fexp1(i,:,:)));
+        
+        title(sprintf('Duty = %f',dutyvals(i)));
+        cax1 = caxis;
+        cax = [min(cax(1),cax1(1)) max(cax(2),cax1(2))];
+        
+        xtick(1:4,xt);
+        ytick(yt);
+    end
+    for i = 1:4
+        caxis(h(i),cax);
+    end
+    colorbar;
+    
     print('-dpdf','test_muscle_mass-5.pdf');    
 
 
     Pcnl = cat(2,NLdata.Pc);
-    Pcnl = reshape(Pcnl, [size(Pcnl,1) size(NLdata)]);
-
+    Pcnl = reshape(Pcnl, [size(Pcnl,1) length(dutyvals) length(islen)]);
+    t = NLdata(1).t;
+    
     figureseries('Nonlinearity effect');
     clf;
-    j = 4;
+
+    leg1 = reshape(leg,[4 6])';
+    
+    clf;
     yl = [Inf -Inf];
-    hax = zeros(4,1);
+    hax = zeros(4,4);
+    k = 1;
     for i = 1:4,
         switch i
             case 1
                 good = ~islen & ~isvel;
-                ttl = 'fl=0, fv=0';
+                ttl = '00';
             case 2
                 good = islen & ~isvel;
-                ttl = 'fv=0';
+                ttl = '0L';
             case 3
                 good = ~islen & isvel;
-                ttl = 'fl=0';
+                ttl = 'V0';
             case 4
                 good = islen & isvel;
-                ttl = 'all';
+                ttl = 'VL';
         end
-        hax(i) = subplot(2,2,i);
-        plot(t, squeeze(Pcnl(:,j,good)));
-        xlabel('Time (s)');
-        ylabel('Force (mN)');
-        title(ttl);
-        if (i == 1)
-            legend('none','stiff=const','work=0','both');
-        end
-        yl1 = ylim;
-        if (yl1(1) < yl(1))
-            yl(1) = yl1(1);
-        end
-        if (yl1(2) > yl(2))
-            yl(2) = yl1(2);
+        for j = 1:length(dutyvals)
+            hax(i,j) = subplot(4,length(dutyvals),k);
+            plot(t, squeeze(Pcnl(:,j,good)));
+            legend(leg1(:,i));
+            xlabel('Time (s)');
+            ylabel('Force (mN)');
+            
+            title(sprintf('%s, duty = %f',ttl,dutyvals(j)));
+            yl1 = ylim;
+            if (yl1(1) < yl(1))
+                yl(1) = yl1(1);
+            end
+            if (yl1(2) > yl(2))
+                yl(2) = yl1(2);
+            end
+            k = k+1;
         end
     end
-    set(hax,'YLim',yl);
+    set(hax(:),'YLim',yl);
+    
     print('-dpdf','test_muscle_mass-6.pdf');    
 end
 
