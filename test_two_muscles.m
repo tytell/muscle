@@ -4,9 +4,9 @@ function test_two_muscles
 %2: m = 0.0542; b = 0.2802; lc0 = 0.9678; k1 = 6.7281; k2 = 23.2794; k30 = 51.3537; k40 = 19.3801; km1 = 17.5804; km2 = 6.0156    ->> sum(dx^2) = 6.056118
 
 filename = 'test_two_muscles.h5';
-wquiet = true;
-doanalysis = {'duty','nonlin'};
-doplot = {};
+quiet = true;
+doanalysis = {}; %{'freq','damping','duty','nonlin'};
+doplot = {'base','freq','damping','duty',};
 
 par.L0 = 2.94;                  % mm
 par.Lis = 2.7;                  % mm
@@ -245,23 +245,22 @@ if ismember('freq',doplot)
     odeopt = odeset('RelTol',1e-6); %, 'OutputFcn', @odeoutput);
     par.omegar = 2*pi*0.5;
     i = find(omegarvals == par.omegar);
-    ph = 0.2;
+    ph = 0.1;
     j = first(freqdata(i).t >= ph);
 
     X0 = freqdata(i).x(j,:);
     X0 = X0 + fxx(j,:,1,i)*0.3;
     [t,x] = ode45(@(t,x) odefcn(t,x,par), freqdata(i).t(j) + [0 2], X0, odeopt);
 
-    Pc1 = freqdata(i).Pc;
-    Pcpert(:,1) = Pc(x(:,1), x(:,2), x(:,4));
-    Pcpert(:,2) = Pc(x(:,5), x(:,6), x(:,8));
+    Pcpert(:,1) = Pc(x(:,1), x(:,2), x(:,4), par);
+    Pcpert(:,2) = Pc(x(:,5), x(:,6), x(:,8), par);
 
     figureseries('Position perturbation');
     hax = zeros(2,1);
     hax(1) = subplot(2,1,1);
-    plot([freqdata(i).t; freqdata(i).t+1], [freqdata(i).x(:,9); freqdata(i).x(:,9)]-L0, 'k-', ...
+    plot([freqdata(i).t; freqdata(i).t+1], [freqdata(i).x(:,9); freqdata(i).x(:,9)], 'k-', ...
          'LineWidth',1.5);
-    addplot(t,x(:,9)-L0, 'LineWidth',2);
+    addplot(t,x(:,9), 'LineWidth',2);
 
     ylabel('L (cm)');
     xtick labeloff;
@@ -321,6 +320,8 @@ if ismember('damping',doanalysis)
 end
 
 if ismember('damping',doplot)
+    dampdata = h5readstruct(filename,'rootgroup','damping');
+    
     isomega = ismember(omegarold,omegarvals);
     islowzeta = zetavals < zetaold;
 
@@ -495,16 +496,8 @@ if ismember('duty',doanalysis)
 end
 
 if ismember('duty',doplot)
-    isomega = ismember(omegaroldvals,omegarvals);
-    iszeta = ismember(zetaoldvals,zetavals);
-    islowduty = dutycyclevals < dutycycleold;
-
-    dutydata = reshape(dutydata, [length(omegarvals) length(zetavals) length(dutycyclevals)]);
-    dutydata = makestructarray(dutydata(:,:,islowduty), dampdata(isomega,iszeta), dutydata(:,:,~islowduty));
-    dutydata = reshape(dutydata, [length(omegarvals) length(zetavals) length(dutycyclevals)+1]);
-
-    dutyall = [dutycyclevals(islowduty) dutycycleold dutycyclevals(~islowduty)];
-
+    dutydata = h5readstruct(dutyfile);
+    
     figureseries('Force length vs duty cycle');
     xx = cat(3, dutydata.x);
     Lall = squeeze(xx(:,9,:));
@@ -542,7 +535,6 @@ end
 
 nonlinfile = 'test_two_muscles_nonlin.h5';
 
-
 vals = fullfact([2 2 2 3]);
 islen = vals(:,1) == 2;
 isvel = vals(:,2) == 2;
@@ -557,26 +549,26 @@ omegarvals = 2*pi* ([0.3 0.5 0.8 1 1.2 1.5 2]);
 [dutyvals2,zetavals2,omegarvals2,nonlinind] = ...
     ndgrid(dutycyclevals,zetavals,omegarvals,1:length(islen));
 if ismember('nonlin',doanalysis)
-    if exist(dutyfile,'file')
-        delete(dutyfile);
+    if exist(nonlinfile,'file')
+        delete(nonlinfile);
     end
-    h5create(dutyfile,'/duty',size(dutyvals2));
-    h5write(dutyfile,'/duty',dutyvals2);
-    h5create(dutyfile,'/zeta',size(zetavals2));
-    h5write(dutyfile,'/zeta',zetavals2);
-    h5create(dutyfile,'/omegar',size(omegarvals2));
-    h5write(dutyfile,'/omegar',omegarvals2);
-    h5create(dutyfile,'/nonlinind',size(omegarvals2));
-    h5write(dutyfile,'/nonlinind',nonlinind);
+    h5create(nonlinfile,'/duty',size(dutyvals2));
+    h5write(nonlinfile,'/duty',dutyvals2);
+    h5create(nonlinfile,'/zeta',size(zetavals2));
+    h5write(nonlinfile,'/zeta',zetavals2);
+    h5create(nonlinfile,'/omegar',size(omegarvals2));
+    h5write(nonlinfile,'/omegar',omegarvals2);
+    h5create(nonlinfile,'/nonlinind',size(omegarvals2));
+    h5write(nonlinfile,'/nonlinind',nonlinind);
 
-    h5create(dutyfile,'/islen',size(omegarvals2));
-    h5write(dutyfile,'/islen',uint8(islen(nonlinind)));
-    h5create(dutyfile,'/isvel',size(omegarvals2));
-    h5write(dutyfile,'/isvel',uint8(isvel(nonlinind)));
-    h5create(dutyfile,'/iswork',size(omegarvals2));
-    h5write(dutyfile,'/iswork',uint8(iswork(nonlinind)));
-    h5create(dutyfile,'/stiff',size(omegarvals2));
-    h5write(dutyfile,'/stiff',stiffval(nonlinind));
+    h5create(nonlinfile,'/islen',size(omegarvals2));
+    h5write(nonlinfile,'/islen',uint8(islen(nonlinind)));
+    h5create(nonlinfile,'/isvel',size(omegarvals2));
+    h5write(nonlinfile,'/isvel',uint8(isvel(nonlinind)));
+    h5create(nonlinfile,'/iswork',size(omegarvals2));
+    h5write(nonlinfile,'/iswork',uint8(iswork(nonlinind)));
+    h5create(nonlinfile,'/stiff',size(omegarvals2));
+    h5write(nonlinfile,'/stiff',stiffval(nonlinind));
     
     dt = 0.005;
     t0 = (0:dt:par.T)';
@@ -586,25 +578,25 @@ if ismember('nonlin',doanalysis)
     
     sz = size(dutyvals2);
 
-    h5create(dutyfile, '/t', [nt 1]);
-    h5write(dutyfile, '/t', t0);
+    h5create(nonlinfile, '/t', [nt 1]);
+    h5write(nonlinfile, '/t', t0);
 
-    h5create(dutyfile, '/ls', [nt 2 sz]);
-    h5create(dutyfile, '/vs', [nt 2 sz]);
-    h5create(dutyfile, '/Ca', [nt 2 sz]);
-    h5create(dutyfile, '/Caf', [nt 2 sz]);
-    h5create(dutyfile, '/m', [nt 2 sz]);
+    h5create(nonlinfile, '/ls', [nt 2 sz]);
+    h5create(nonlinfile, '/vs', [nt 2 sz]);
+    h5create(nonlinfile, '/Ca', [nt 2 sz]);
+    h5create(nonlinfile, '/Caf', [nt 2 sz]);
+    h5create(nonlinfile, '/m', [nt 2 sz]);
 
-    h5create(dutyfile, '/Pc', [nt 2 sz]);
-    h5create(dutyfile, '/lc', [nt 2 sz]);
-    h5create(dutyfile, '/vc', [nt 2 sz]);
+    h5create(nonlinfile, '/Pc', [nt 2 sz]);
+    h5create(nonlinfile, '/lc', [nt 2 sz]);
+    h5create(nonlinfile, '/vc', [nt 2 sz]);
 
-    h5create(dutyfile, '/L', [nt sz]);
-    h5create(dutyfile, '/V', [nt sz]);
+    h5create(nonlinfile, '/L', [nt sz]);
+    h5create(nonlinfile, '/V', [nt sz]);
     
-    h5create(dutyfile, '/fx', [nt nd nd sz]);
-    h5create(dutyfile, '/fexp', [nd sz]);
-    h5create(dutyfile, '/fmode', [2*nfourier+1 nd nd sz]);
+    h5create(nonlinfile, '/fx', [nt nd nd sz]);
+    h5create(nonlinfile, '/fexp', [nd sz]);
+    h5create(nonlinfile, '/fmode', [2*nfourier+1 nd nd sz]);
 
     X0 = [0   0   0   0    1    ...
           0   0   0   0    1    ...
@@ -671,19 +663,19 @@ if ismember('nonlin',doanalysis)
         [i1,i2,i3,i4] = ind2sub(sz,k);
         ind = [i1 i2 i3 i4];
         
-        h5write(dutyfile, '/ls', data1.x(:,[1 6]), [1 1 ind], [nt 2 ones(size(ind))]);
-        h5write(dutyfile, '/vs', data1.x(:,[2 7]), [1 1 ind], [nt 2 ones(size(ind))]);
-        h5write(dutyfile, '/Ca', data1.x(:,[3 8]), [1 1 ind], [nt 2 ones(size(ind))]);
-        h5write(dutyfile, '/Caf', data1.x(:,[4 9]), [1 1 ind], [nt 2  ones(size(ind))]);
-        h5write(dutyfile, '/m', data1.x(:,[5 10]), [1 1 ind], [nt 2 ones(size(ind))]);
+        h5write(nonlinfile, '/ls', data1.x(:,[1 6]), [1 1 ind], [nt 2 ones(size(ind))]);
+        h5write(nonlinfile, '/vs', data1.x(:,[2 7]), [1 1 ind], [nt 2 ones(size(ind))]);
+        h5write(nonlinfile, '/Ca', data1.x(:,[3 8]), [1 1 ind], [nt 2 ones(size(ind))]);
+        h5write(nonlinfile, '/Caf', data1.x(:,[4 9]), [1 1 ind], [nt 2  ones(size(ind))]);
+        h5write(nonlinfile, '/m', data1.x(:,[5 10]), [1 1 ind], [nt 2 ones(size(ind))]);
         
-        h5write(dutyfile, '/Pc',data1.Pc, [1 1 ind], [nt 2 ones(size(ind))]);
-        h5write(dutyfile, '/lc',data1.lc, [1 1 ind], [nt 2 ones(size(ind))]);
-        h5write(dutyfile, '/vc',data1.vc, [1 1 ind], [nt 2 ones(size(ind))]);
+        h5write(nonlinfile, '/Pc',data1.Pc, [1 1 ind], [nt 2 ones(size(ind))]);
+        h5write(nonlinfile, '/lc',data1.lc, [1 1 ind], [nt 2 ones(size(ind))]);
+        h5write(nonlinfile, '/vc',data1.vc, [1 1 ind], [nt 2 ones(size(ind))]);
 
-        h5write(dutyfile, '/fx',data1.fx, [1 1 1 ind], [nt nd nd ones(size(ind))]);
-        h5write(dutyfile, '/fexp',data1.fexp, [1 ind], [nd ones(size(ind))]);
-        h5write(dutyfile, '/fmode',data1.fmode, [1 1 1 ind], [2*nfourier+1 nd nd ones(size(ind))]);
+        h5write(nonlinfile, '/fx',data1.fx, [1 1 1 ind], [nt nd nd ones(size(ind))]);
+        h5write(nonlinfile, '/fexp',data1.fexp, [1 ind], [nd ones(size(ind))]);
+        h5write(nonlinfile, '/fmode',data1.fmode, [1 1 1 ind], [2*nfourier+1 nd nd ones(size(ind))]);
         
         progress(k);
     end
@@ -703,51 +695,51 @@ if ismember('nonlin',doplot)
     fexp = reshape(fexp,[size(fexp,1) size(nonlindata)]);
 
     figureseries('Floquet exponents vs nonlinearity');
-    lab = {'flat','FL','FV','FLV'};
-    clf;
-    for i = 1:2
-        hax(i) = subplot(2,1,i);
-        plot(dutycyclevals, log(0.5) ./ real(flatten(fexp(i,:,2,:),1:3)), 'o-');
-        xlabel('Duty cycle');
-        ylabel('t_{1/2} (sec)');
-        title(sprintf('Mode %d time constants',i));
-        legend(lab, 'Location','NE');
-    end
-    %** Print figure
-    print('-dpdf','test_two_muscles-11.pdf');
-
-    figureseries('Limit cycle vs nonlinearity');
-    clf;
-    subplot(2,1,1);
-    plot(tt,squeeze(Pcall(:,1,:,2,2)));
-    addplot(tt,squeeze(Pcall(:,2,:,2,2)),'--');
-
-    subplot(2,1,2);
-    plot(tt,squeeze(xx(:,9,:,2,2)));
-    %** Print figure
-    print('-dpdf','test_two_muscles-12.pdf');
-    
-    figureseries('Limit cycle vs duty cycle');
-    clf;
-    subplot(2,1,1);
-    plot(tt,squeeze(Pcall(:,1,4,2,:)));
-
-    subplot(2,1,2);
-    plot(tt,squeeze(xx(:,9,4,2,:)));
-    %** Print figure
-    print('-dpdf','test_two_muscles-13.pdf');
-
-    figureseries('Floquet exponents vs duty cycle2');
-    clf;
-    for i = 1:2
-        hax(i) = subplot(2,1,i);
-        plot(dutycyclevals, log(0.5) ./ real(flatten(fexp(i,4,:,:),1:3)), 'o-');
-        xlabel('Duty cycle');
-        ylabel('t_{1/2} (sec)');
-        title(sprintf('Mode %d time constants',i));
-    end
-    %** Print figure
-    print('-dpdf','test_two_muscles-14.pdf');
+%     lab = {'flat','FL','FV','FLV'};
+%     clf;
+%     for i = 1:2
+%         hax(i) = subplot(2,1,i);
+%         plot(dutycyclevals, log(0.5) ./ real(flatten(fexp(i,:,2,:),1:3)), 'o-');
+%         xlabel('Duty cycle');
+%         ylabel('t_{1/2} (sec)');
+%         title(sprintf('Mode %d time constants',i));
+%         legend(lab, 'Location','NE');
+%     end
+%     %** Print figure
+%     print('-dpdf','test_two_muscles-11.pdf');
+% 
+%     figureseries('Limit cycle vs nonlinearity');
+%     clf;
+%     subplot(2,1,1);
+%     plot(tt,squeeze(Pcall(:,1,:,2,2)));
+%     addplot(tt,squeeze(Pcall(:,2,:,2,2)),'--');
+% 
+%     subplot(2,1,2);
+%     plot(tt,squeeze(xx(:,9,:,2,2)));
+%     %** Print figure
+%     print('-dpdf','test_two_muscles-12.pdf');
+%     
+%     figureseries('Limit cycle vs duty cycle');
+%     clf;
+%     subplot(2,1,1);
+%     plot(tt,squeeze(Pcall(:,1,4,2,:)));
+% 
+%     subplot(2,1,2);
+%     plot(tt,squeeze(xx(:,9,4,2,:)));
+%     %** Print figure
+%     print('-dpdf','test_two_muscles-13.pdf');
+% 
+%     figureseries('Floquet exponents vs duty cycle2');
+%     clf;
+%     for i = 1:2
+%         hax(i) = subplot(2,1,i);
+%         plot(dutycyclevals, log(0.5) ./ real(flatten(fexp(i,4,:,:),1:3)), 'o-');
+%         xlabel('Duty cycle');
+%         ylabel('t_{1/2} (sec)');
+%         title(sprintf('Mode %d time constants',i));
+%     end
+%     %** Print figure
+%     print('-dpdf','test_two_muscles-14.pdf');
 end
 
 
