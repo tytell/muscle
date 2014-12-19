@@ -4,8 +4,8 @@ function test_two_muscles
 %2: m = 0.0542; b = 0.2802; lc0 = 0.9678; k1 = 6.7281; k2 = 23.2794; k30 = 51.3537; k40 = 19.3801; km1 = 17.5804; km2 = 6.0156    ->> sum(dx^2) = 6.056118
 
 filename = 'test_two_muscles.h5';
-quiet = true;
-doanalysis = {'freq','damping','duty','nonlin'};
+wquiet = true;
+doanalysis = {'duty','nonlin'};
 doplot = {};
 
 par.L0 = 2.94;                  % mm
