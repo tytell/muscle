@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #SBATCH --job-name=tytell2musc
-#SBATCH --output=slurm.%N.%j.out
-#SBATCH --error=slurm.%N.%j.err
+#SBATCH --output=test_two_muscles.slurm.%N.%j.out
+#SBATCH --error=test_two_muscles.slurm.%N.%j.err
 #SBATCH --nodes=1
 
 #SBATCH --partition=batch
