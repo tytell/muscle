@@ -5,7 +5,7 @@ function test_two_muscles
 
 filename = 'test_two_muscles.h5';
 quiet = true;
-doanalysis = {}; %{'freq','damping','duty','nonlin'};
+doanalysis = {'freq'}; %{'freq','damping','duty','nonlin'};
 doplot = {'base','freq','damping','duty',};
 
 par.L0 = 2.94;                  % mm
@@ -193,7 +193,7 @@ if ismember('freq',doplot)
     Pcall = cat(3, freqdata.Pc);
 
     subplot(1,2,1);
-    imagesc(freqdata(1).t, 1./(omegarvals/(2*pi)), squeeze(xx(:,9,:))');
+    imagesc(freqdata(1).t, 1./(omegarvals/(2*pi)), squeeze(xx(:,Lind,:))');
     ylabel('Frequency ratio f_{act}/f_{res} (Hz)');
     xlabel('Time (sec)');
     hcol = colorbar;
@@ -223,15 +223,15 @@ if ismember('freq',doplot)
 
     figureseries('Floquet modes vs resonant frequency');
     clf;
-    hln = -1*ones(10,1);
+    hln = -1*ones(12,1);
     for i = 1:4,
         subplot(2,2,i);
         j = showfreq(i);
         
         if (isreal(fxx(:,:,1,j)))
-            hln(1:4) = plot(freqdata(j).t, fxx(:,1:4,1,j));
-            hln(5:8) = addplot(freqdata(j).t, fxx(:,5:8,1,j),'--');
-            hln(9:10) = addmplot(freqdata(j).t, fxx(:,9:10,1,j),'k-|k--','LineWidth',2);
+            hln(1:5) = plot(freqdata(j).t, fxx(:,1:5,1,j));
+            hln(6:10) = addplot(freqdata(j).t, fxx(:,6:10,1,j),'--');
+            hln(11:12) = addmplot(freqdata(j).t, fxx(:,11:12,1,j),'k-|k--','LineWidth',2);
         else
             plot(freqdata(j).t, real(fxx(:,:,1,j)));
             addplot(freqdata(j).t, imag(fxx(:,:,1,j)),'--');
@@ -239,7 +239,7 @@ if ismember('freq',doplot)
         xlabel('Time (s)');
         title(sprintf('f_{res} = %g',omegarvals(j)/(2*pi)));
     end
-    legend(hln([1:4 9 10]),'lc','vc','Ca','Caf','L','V','Location','best');
+    legend(hln([1:5 11:12]),'ls','vs','Ca','Caf','m','L','V','Location','best');
     print('-dpdf','test_two_muscles-4.pdf');
 
     odeopt = odeset('RelTol',1e-6); %, 'OutputFcn', @odeoutput);
@@ -252,15 +252,17 @@ if ismember('freq',doplot)
     X0 = X0 + fxx(j,:,1,i)*0.3;
     [t,x] = ode45(@(t,x) odefcn(t,x,par), freqdata(i).t(j) + [0 2], X0, odeopt);
 
-    Pcpert(:,1) = Pc(x(:,1), x(:,2), x(:,4), par);
-    Pcpert(:,2) = Pc(x(:,5), x(:,6), x(:,8), par);
+    lcpert = par.L1 + x(:,Lind)*[1 -1] - x(:,[ls1ind ls2ind]);
+    vcpert = x(:,Vind)*[1 -1] - x(:,[vs1ind vs2ind]);
+
+    Pcpert = Pc(lcpert, vcpert, x(:,[Caf1ind Caf2ind]), par);
 
     figureseries('Position perturbation');
     hax = zeros(2,1);
     hax(1) = subplot(2,1,1);
-    plot([freqdata(i).t; freqdata(i).t+1], [freqdata(i).x(:,9); freqdata(i).x(:,9)], 'k-', ...
+    plot([freqdata(i).t; freqdata(i).t+1], [freqdata(i).x(:,Lind); freqdata(i).x(:,Lind)], 'k-', ...
          'LineWidth',1.5);
-    addplot(t,x(:,9), 'LineWidth',2);
+    addplot(t,x(:,Lind), 'LineWidth',2);
 
     ylabel('L (cm)');
     xtick labeloff;
