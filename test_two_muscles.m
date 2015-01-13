@@ -5,8 +5,8 @@ function test_two_muscles
 
 filename = 'test_two_muscles.h5';
 quiet = true;
-doanalysis = {'freq'}; %{'freq','damping','duty','nonlin'};
-doplot = {'base','freq','damping','duty',};
+doanalysis = {'freq','damping','duty','nonlin'};
+doplot = {}; %{'base','freq','damping','duty',};
 
 par.L0 = 2.94;                  % mm
 par.Lis = 2.7;                  % mm
