@@ -4,9 +4,16 @@ function test_muscle2
 %2: m = 0.0542; b = 0.2802; lc0 = 0.9678; k1 = 6.7281; k2 = 23.2794; k30 = 51.3537; k40 = 19.3801; km1 = 17.5804; km2 = 6.0156    ->> sum(dx^2) = 6.056118
 
 filename = 'test_muscle2.h5';
-doanalysis = {'phase','pert'};
-doplot = {'init','phase','pert','nonlin','damping','calcium'}; %{'init','phase','pert','dev','length','nonlin','damping','calcium'};
+doanalysis = {'phase','pert','dev','length','nolin','calcium','duty'};
+check = true;
+doplot = {'init','phase','pert','dev','length'}; %{'init','phase','pert','dev','length','nonlin','damping','calcium'};
 
+if exist(filename,'file') && inputyn('Overwrite data file? ','default',false)
+    delete(filename);
+else
+    return;
+end
+    
 par.L0 = 2.94;                  % mm
 par.Lis = 2.7;                  % mm
 
@@ -42,7 +49,9 @@ par.T = 1;
 par.actdur = 0.36;
 
 par.act = @(t) mod(t,1) < par.actdur;
-par.L = @(t) par.L1 + par.A * cos(2*pi/T * (t - par.phi));
+par.L = @(t) par.L1 + par.A * cos(2*pi/par.T * (t - par.phi));
+par.Lp = @(t) -2*pi/par.T * par.A * sin(2*pi/par.T * (t - par.phi));
+par.Lpp = @(t) -(2*pi/par.T)^2 * par.A * cos(2*pi/par.T * (t - par.phi));
 
 dt = 0.005;
 phitest = 0:0.05:0.95;
@@ -55,6 +64,10 @@ nd = 5;
 
 pertmag = 0.1;
 
+X0 = [par.L1+par.A   0   0   0   1];
+d = check_jacobian(0,X0', 0.02*ones(length(X0),1), @(t,x) odefcn(t,x,par), @(t,x) jfcn(t,x,par));
+assert(d < 1e-10);
+
 if ismember('init',doplot)
     tinit = [0 15*par.T];
     odeopt = odeset('RelTol',1e-6); %, 'OutputFcn', @odeplot);
@@ -63,8 +76,8 @@ if ismember('init',doplot)
     
     par.L = @(t) par.L1 + par.A * cos(2*pi/par.T * (t - phi1));
     par.Lp = @(t) -2*pi/par.T * par.A * sin(2*pi/par.T * (t - phi1));
-    par.Lpp = @(t) -(2*pi/par.T * par.A)^2 * cos(2*pi/par.T * (t - phi1));
-    X0 = [par.L1+par.A   0   0   0   1];
+    par.Lpp = @(t) -(2*pi/par.T)^2 * par.A * cos(2*pi/par.T * (t - phi1));
+    X0 = [par.L(0)   0   0   0   1];
     [t,x] = ode45(@(t,x) odefcn(t,x,par), tinit, X0, odeopt);
 
     Pc1 = Pc(x(:,1),x(:,2), x(:,4), par);
@@ -79,7 +92,7 @@ if (ismember('phase',doanalysis))
     
     phasedata = struct('t',z, 'x',z5, 'xp',z5, 'sol',struct([]), ...
         'per',par.T, 'fcn',@(t,x) odefcn(t,x,par), ...
-        'phi',0,'L',z,'V',z, 'L1',0, 'A',0, 'T',0, 'lc',z, 'vc',z, 'Pc',z, ...
+        'phi',0,'L',z,'V',z, 'L1',0, 'A',0, 'T',0, 'Pc',z, ...
         'jfcn',@(t,x) jfcn(t,x,par), 'fx',zeros(n,5,5), 'fexp',zeros(5,1), ...
         'fmode',zeros(n,5,5));
     phasedata = repmat(phasedata,[1 length(phitest)]);
@@ -89,30 +102,32 @@ if (ismember('phase',doanalysis))
         phi1 = phitest(i);
         
         par.L = @(t) par.L1 + par.A * cos(2*pi/par.T * (t - phi1));
-        par.V = @(t) -2*pi/par.T * par.A * sin(2*pi/par.T * (t - phi1));
-        X0 = [0   0   0   0   1];
+        par.Lp = @(t) -2*pi/par.T * par.A * sin(2*pi/par.T * (t - phi1));
+        par.Lpp = @(t) -(2*pi/par.T)^2 * par.A * cos(2*pi/par.T * (t - phi1));
+        X0 = [par.L(0)   0   0   0   1];
         
         [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x,par), dt, par.T, X0, ...
             'Display','iter-detailed', 'fixedperiod',true, 'initialcycles',2, 'TolX',1e-8, 'RelTol',1e-6);
         data1.phi = phi1;
         data1.L = par.L(data1.t);
-        data1.V = par.V(data1.t);
+        data1.V = par.Lp(data1.t);
         data1.L1 = par.L1;
         data1.A = par.A;
         data1.T = par.T;
-        data1.lc = data1.L - data1.x(:,1);
-        data1.vc = data1.V - data1.x(:,2);
-        data1.Pc = Pc(data1.lc, data1.vc, data1.x(:,4), par);
+        data1.Pc = Pc(data1.x(:,1), data1.x(:,2), data1.x(:,4), par);
         
         data1 = get_floquet(data1,@(t,x) jfcn(t,x,par), 100);
         phasedata(i) = data1;
         
         progress(i);
+        if check
+            break;
+        end
     end
     h5writestruct(filename,phasedata,'rootgroup','phase');
 end
 
-if ismember('phase',doplot)
+if ~check && ismember('phase',doplot)
     phasedata = h5readstruct(filename,'rootgroup','phase');
     
     Pcall = cat(2,phasedata.Pc);
@@ -181,9 +196,9 @@ if ismember('phase',doplot)
     for i = 1:4,
         subplot(2,2,i);
         j = showphi(i);
-        plot(phasedata(j).t, real(fxx(:,:,1,j)));
+        plot(phasedata(j).t, real(fxx(:,:,1,j)), 'LineWidth',2);
         if any(~isreal(fxx(:,:,1,j)))
-            addplot(phasedata(j).t, imag(fxx(:,:,1,j)));
+            addplot(phasedata(j).t, imag(fxx(:,:,1,j)), '--','LineWidth',2);
         end
         xlabel('Time (s)');
         title(sprintf('\\phi_{act} = %g',phitest(j)));
@@ -221,7 +236,8 @@ if ismember('phase',doplot)
         subplot(2,2,i);
         j = showphi(i);
         h1 = plot(phasedata(j).t, phasedata(j).x, 'k--');
-        h2 = addplot(phasedata(j).t, phasedata(j).x + 0.1*real(fxx(:,:,1,j)));
+        h2 = addplot(phasedata(j).t, phasedata(j).x + 0.1*real(fxx(:,:,1,j)), ...
+            'LineWidth',2);
         xlabel('Time (s)');
         title(sprintf('\\phi_{act} = %g',phitest(j)));
     end
@@ -232,17 +248,22 @@ end
 if (ismember('pert',doanalysis))
     data = h5readstruct(filename,'rootgroup','phase');
     
-    i = 3;
+    if ~check
+        i = 3;
+    else
+        i = 1;
+    end
     t0 = data(i).t;
     xbase = data(i).x;
     Pcbase = data(i).Pc;
-    lcbase = data(i).lc;
-    vcbase = data(i).vc;
+    lcbase = data(i).x(:,1);
+    vcbase = data(i).x(:,2);
     
     phi1 = phitest(i);
 
     par.L = @(t) data(i).L1 + data(i).A * cos(2*pi/data(i).T * (t - data(i).phi));
-    par.V = @(t) -2*pi/data(i).T * data(i).A * sin(2*pi/data(i).T * (t - data(i).phi));
+    par.Lp = @(t) -2*pi/data(i).T * data(i).A * sin(2*pi/data(i).T * (t - data(i).phi));
+    par.Lpp = @(t) -(2*pi/data(i).T).^2 * data(i).A * cos(2*pi/data(i).T * (t - data(i).phi));
     
     phipert = [0.2 0.7 0.2 0.2];
     pertval = [0.1 0 0 0 0; ...
@@ -267,9 +288,7 @@ if (ismember('pert',doanalysis))
         if (a > 1)
             x1(1:a-1,:) = deval(sol, par.T + t0(1:a-1))';
         end
-        lc1 = par.L(t1) - x1(:,1);
-        vc1 = par.V(t1) - x1(:,2);
-        Pc1 = Pc(lc1, vc1, x1(:,4), par);
+        Pc1 = Pc(x1(:,1), x1(:,2), x1(:,4), par);
 
         pertdata(i,j).phipert = phipert(j);
         pertdata(i,j).xbase = xbase;
@@ -281,16 +300,18 @@ if (ismember('pert',doanalysis))
         pertdata(i,j).xinit = xinit;
         pertdata(i,j).L = par.L(t0);
         pertdata(i,j).L = par.L(t1);
-        pertdata(i,j).lc = lc1;
-        pertdata(i,j).vc = vc1;
         pertdata(i,j).Pc = Pc1;
         progress(j);
+        
+        if check
+            break;
+        end
     end
 
     h5writestruct(filename,pertdata,'rootgroup','pert');
 end
 
-if ismember('pert',doplot)
+if ~check && ismember('pert',doplot)
     pertdata = h5readstruct(filename,'rootgroup','pert');
 
     figureseries('Random perturbations');
@@ -314,8 +335,8 @@ if ismember('pert',doplot)
 
     col = 'rgbc';
     for j = 1:size(pertdata,2)
-        addplot(hax(1), t0,pertdata(i,j).lc, [col(j) '--']);
-        addplot(hax(2), t0,pertdata(i,j).vc, [col(j) '--']);
+        addplot(hax(1), t0,pertdata(i,j).x(:,1), [col(j) '--']);
+        addplot(hax(2), t0,pertdata(i,j).x(:,2), [col(j) '--']);
         addplot(hax(3), t0,pertdata(i,j).x(:,4), [col(j) '--']);
         addplot(hax(4), t0,pertdata(i,j).Pc, [col(j) '--']);
     end
@@ -376,11 +397,12 @@ if (ismember('dev',doanalysis))
         t0 = data(i).t;
         xbase = data(i).x;
         Pcbase = data(i).Pc;
-        lcbase = data(i).lc;
-        vcbase = data(i).vc;
+        lcbase = data(i).x(:,1);
+        vcbase = data(i).x(:,2);
 
         par.L = @(t) data(i).L1 + data(i).A * cos(2*pi/data(i).T * (t - data(i).phi));
-        par.V = @(t) -2*pi/data(i).T * data(i).A * sin(2*pi/data(i).T * (t - data(i).phi));
+        par.Lp = @(t) -2*pi/data(i).T * data(i).A * sin(2*pi/data(i).T * (t - data(i).phi));
+        par.Lpp = @(t) -(2*pi/data(i).T).^2 * data(i).A * cos(2*pi/data(i).T * (t - data(i).phi));
         
         W0(i) = trapz(-data(i).L, Pcbase);
         % plot(-data(i).L(t), Pcbase, 'k-');
@@ -398,7 +420,7 @@ if (ismember('dev',doanalysis))
             dev1 = bsxfun(@times, dev1, dec1);
 
             xfx1 = xbase + 0.2*dev1;
-            Pcdevall(:,i,j) = Pc(par.L(t0)-xfx1(:,1),par.V(t0)-xfx1(:,2),xfx1(:,4), par);
+            Pcdevall(:,i,j) = Pc(xfx1(:,1),xfx1(:,2),xfx1(:,4), par);
 
             Wdev(i,j) = trapz(-data(i).L, Pcdevall(:,i,j));
             %addplot(-data(i).L(t), Pcdevall(:,i,j), 'r-');
@@ -414,9 +436,7 @@ if (ismember('dev',doanalysis))
                 if (a > 1)
                     x1(1:a-1,:) = deval(sol, par.T + t0(1:a-1))';
                 end
-                lc1 = par.L(t1) - x1(:,1);
-                vc1 = par.V(t1) - x1(:,2);
-                Pc1 = Pc(lc1,vc1, x1(:,4), par);
+                Pc1 = Pc(x1(:,1),x1(:,2), x1(:,4), par);
             else
                 x1 = NaN(length(t0),5);
                 lc1 = NaN(length(t0),1);
@@ -433,23 +453,27 @@ if (ismember('dev',doanalysis))
             devdata(i,j).x = x1;
             devdata(i,j).xfx = xfx1;
             devdata(i,j).L = par.L(t1);
-            devdata(i,j).V = par.V(t1);
-            devdata(i,j).lc = lc1;
-            devdata(i,j).vc = vc1;
+            devdata(i,j).V = par.Lp(t1);
             devdata(i,j).Pc = Pc1;
                         
             n = n+1;
             
             progress(n);
+            if check
+                break;
+            end
         end
         h5writestruct(filename,devdata,'rootgroup','dev');
         h5write(filename,'/Pcdevall',Pcdevall);
         h5write(filename,'/W0',W0);
         h5write(filename,'/Wdev',Wdev);
+        if check
+            break;
+        end
     end
 end
 
-if ismember('dev',doplot)
+if ~check && ismember('dev',doplot)
     data = h5readstruct(filename,'rootgroup','phase');
     devdata = h5readstruct(filename,'rootgroup','dev');
     Pcdevall = h5read(filename,'/Pcdevall');
@@ -524,35 +548,43 @@ if (ismember('length',doanalysis))
             par.L1 = L1test(j);
 
             par.L = @(t) par.L1 + par.A * cos(2*pi/par.T * (t - phi));
-            par.V = @(t) -2*pi/par.T * par.A * sin(2*pi/par.T * (t - phi));
-            X0 = [0   0   0   0   1];
+            par.Lp = @(t) -2*pi/par.T * par.A * sin(2*pi/par.T * (t - phi));
+            par.Lpp = @(t) -(2*pi/par.T * par.A).^2 * sin(2*pi/par.T * (t - phi));
+            X0 = [par.L(0)   0   0   0   1];
 
             [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x,par), dt, par.T, X0, ...
                 'Display','iter-detailed', 'fixedperiod',true, 'initialcycles',2, 'TolX',1e-8, 'RelTol',1e-6);
             
-            data1.lc = par.L(data1.t) - data1.x(:,1);
-            data1.vc = par.V(data1.t) - data1.x(:,2);
-            data1.Pc = Pc(data1.lc, data1.vc, data1.x(:,4), par);
+            data1.Pc = Pc(data1.x(:,1), data1.x(:,2), data1.x(:,4), par);
 
             data1 = get_floquet(data1,@(t,x) jfcn(t,x,par), 100);
             data1.L = par.L(data1.t);
-            data1.V = par.V(data1.t);
+            data1.V = par.Lp(data1.t);
             L1data = makestructarray(L1data,data1);
             n = n+1;
             progress(n);
+            if check
+                break;
+            end
+        end
+        if check
+            break;
         end
     end
-    L1data = reshape(L1data,[length(L1test) length(phitest2)]);
-    h5writestruct(filename,L1data,'rootgroup','length');
+    if ~check
+        L1data = reshape(L1data,[length(L1test) length(phitest2)]);
+        h5writestruct(filename,L1data,'rootgroup','length');
+    end
     %reset L1
     par.L1 = L1orig;
 end
 
-if ismember('length',doplot)
+if ~check && ismember('length',doplot)
     L1data = h5readstruct(filename,'rootgroup','length');
     
     t = L1data(1).t;
-    lcall = cat(2,L1data.lc);
+    xall = cat(3,L1data.x);
+    lcall = squeeze(xall(:,1,:));
     lcall = reshape(lcall,[],3,length(phitest2));
 
     col = get(groot,'defaultAxesColorOrder');
@@ -589,11 +621,10 @@ if ismember('length',doplot)
     print('-dpdf','LengthEffect.pdf');
 end
 
-vals = fullfact([2 2 2 3]);
+vals = fullfact([2 2 2]);
 islen = vals(:,1) == 2;
 isvel = vals(:,2) == 2;
 iswork = vals(:,3) == 2;
-stiffval = vals(:,4);
 N = length(islen)*length(phitest2);
 nldone = false;
 
@@ -622,35 +653,23 @@ if (ismember('nonlin',doanalysis))
         else
             par.km1 = 0;
         end
-        switch stiffval(i)
-          case 1
-            par.mu0 = par0.mu0 + par0.mu1;
-            par.mu1 = 0;
-          case 2
-            par.mu0 = par0.mu0;
-            par.mu1 = 0;
-          case 3
-            par.mu0 = par0.mu0;
-            par.mu1 = par0.mu1;
-        end
         
         for k = 1:length(phitest2)
             phi = phitest2(k);
 
             par.L = @(t) par.L1 + par.A * cos(2*pi/par.T * (t - phi));
-            par.V = @(t) -2*pi/par.T * par.A * sin(2*pi/par.T * (t - phi));
-            X0 = [0   0   0   0   1];
+            par.Lp = @(t) -2*pi/par.T * par.A * sin(2*pi/par.T * (t - phi));
+            par.Lpp = @(t) -(2*pi/par.T).^2 * par.A * sin(2*pi/par.T * (t - phi));
+            X0 = [par.L(0)   0   0   0   1];
 
             [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x, par), 0.005, par.T, X0, ...
                 'Display','iter-detailed', 'fixedperiod',true, 'initialcycles',2, 'TolX',1e-8, 'RelTol',1e-6);
 
-            data1.lc = par.L(data1.t) - data1.x(:,1);
-            data1.vc = par.V(data1.t) - data1.x(:,2);
-            data1.Pc = Pc(data1.lc, data1.vc, data1.x(:,4), par);
+            data1.Pc = Pc(data1.x(:,1), data1.x(:,2), data1.x(:,4), par);
 
             data1 = get_floquet(data1,@(t,x) jfcn(t,x, par), 100);
             data1.L = par.L(data1.t);
-            data1.V = par.V(data1.t);
+            data1.V = par.Lp(data1.t);
             data1.islen = islen(i);
             data1.isvel = isvel(i);
             data1.iswork = iswork(i);
@@ -659,6 +678,9 @@ if (ismember('nonlin',doanalysis))
             NLdata = makestructarray(NLdata,data1);
             n = n+1;
             progress(n);
+            if check
+                break;
+            end
         end
     end
     NLdata = reshape(NLdata,[length(phitest2) length(islen)]);
@@ -667,7 +689,7 @@ if (ismember('nonlin',doanalysis))
     par = par0;
 end
 
-if ismember('nonlin',doplot)
+if ~check && ismember('nonlin',doplot)
     NLdata = h5readstruct(filename,'rootgroup','nonlin');
 
     figureseries('Floquet exp vs nonlin');
@@ -799,53 +821,6 @@ if ismember('nonlin',doplot)
     print('-dpdf','NonLin.pdf');
 end
 
-Btest = [0.05 0.1 0.28 0.5 1 2];
-if ismember('damping',doanalysis)
-    Bdata = struct([]);
-    for i = 1:length(phitest2)
-        phi = phitest2(i);
-        for j = 1:length(Btest)
-            par.b = Btest(j);
-            
-            par.L = @(t) par.L1 + par.A * cos(2*pi/par.T * (t - phi));
-            par.V = @(t) -2*pi/par.T * par.A * sin(2*pi/par.T * (t - phi));
-            X0 = [0   0   0   0   1];
-
-            [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x, par), 0.005, par.T, X0, ...
-                'Display','iter-detailed', 'fixedperiod',true, 'initialcycles',2, 'TolX',1e-8, 'RelTol',1e-6);
-
-            data1.lc = par.L(data1.t) - data1.x(:,1);
-            data1.vc = par.V(data1.t) - data1.x(:,2);
-            data1.Pc = Pc(data1.lc, data1.vc, data1.x(:,4), par);
-
-            data1 = get_floquet(data1,@(t,x) jfcn(t,x, par), 100);
-            
-            data1.L = par.L(data1.t);
-            data1.V = par.V(data1.t);
-            data1.b = par.b;
-            Bdata = makestructarray(Bdata,data1);
-        end
-    end
-    Bdata = reshape(Bdata,[length(Btest) length(phitest2)]);
-    h5writestruct(filename,Bdata,'rootgroup','damping');
-end
-
-if ismember('damping',doplot)
-    Bdata = h5readstruct(filename,'rootgroup','damping');
-    figureseries('Damping effect');
-    fexp = cat(3,Bdata.fexp);
-    fexp = reshape(fexp,[5 size(Bdata)]);
-    
-    Btime = log(0.5) ./ real(squeeze(fexp(1,:,:)));
-    plot(Btest,nanmedian(Btime,2),'ko-');
-    addplot([Btest; Btest],[min(Btime,[],2) max(Btime,[],2)]','k-');
-    
-    xlabel('Damping coefficient');
-    ylabel('t_{1/2} (sec)');
-    title('Mode one time constant vs damping');
-    print('-dpdf','Damping.pdf');
-end
-
 k3test = 0.6:0.1:1.4;
 k4test = [0.8 1 1.2];
 if ismember('calcium',doanalysis)
@@ -854,8 +829,9 @@ if ismember('calcium',doanalysis)
     k40 = par.k40;
     
     par.L = @(t) par.L1 + par.A * cos(2*pi/par.T * (t - phi));
-    par.V = @(t) -2*pi/par.T * par.A * sin(2*pi/par.T * (t - phi));
-    X0 = [0   0   0   0   1];
+    par.Lp = @(t) -2*pi/par.T * par.A * sin(2*pi/par.T * (t - phi));
+    par.Lpp = @(t) -(2*pi/par.T).^2 * par.A * cos(2*pi/par.T * (t - phi));
+    X0 = [par.L(0)   0   0   0   1];
     
     k34data = struct([]);
     for i = 1:length(k3test)
@@ -866,26 +842,32 @@ if ismember('calcium',doanalysis)
             [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x, par), 0.005, par.T, X0, ...
                 'Display','iter-detailed', 'fixedperiod',true, 'initialcycles',2, 'TolX',1e-8, 'RelTol',1e-6);
 
-            data1.lc = par.L(data1.t) - data1.x(:,1);
-            data1.vc = par.V(data1.t) - data1.x(:,2);
-            data1.Pc = Pc(data1.lc, data1.vc, data1.x(:,4), par);
+            data1.Pc = Pc(data1.x(:,1), data1.x(:,2), data1.x(:,4), par);
 
             data1 = get_floquet(data1,@(t,x) jfcn(t,x, par), 100);
             data1.L = par.L(data1.t);
-            data1.V = par.V(data1.t);
+            data1.V = par.Lp(data1.t);
             data1.k30 = par.k30;
             data1.k40 = par.k40;
             k34data = makestructarray(k34data,data1);
+            if check
+                break;
+            end
+        end
+        if check
+            break;
         end
     end
-    k34data = reshape(k34data,[length(k4test) length(k3test)]);
-    h5writestruct(filename,k34data,'rootgroup','calcium');
+    if ~check
+        k34data = reshape(k34data,[length(k4test) length(k3test)]);
+        h5writestruct(filename,k34data,'rootgroup','calcium');
+    end
     
     par.k30 = k30;
     par.k40 = k40;
 end
 
-if ismember('calcium',doplot)
+if ~check && ismember('calcium',doplot)
     k34data = h5readstruct(filename,'rootgroup','calcium');
     figureseries('Calcium dynamics effect');
     fx = cat(3,k34data.fexp);
@@ -965,8 +947,9 @@ if ismember('duty',doanalysis)
         par.k40 = k4vals2(i)*k40;
         
         par.L = @(t) par.L1 + par.A * cos(2*pi/par.T * (t - phi));
-        par.V = @(t) -2*pi/par.T * par.A * sin(2*pi/par.T * (t - phi));
-        X0 = [0   0   0   0   1];
+        par.Lp = @(t) -2*pi/par.T * par.A * sin(2*pi/par.T * (t - phi));
+        par.Lpp = @(t) -(2*pi/par.T).^2 * par.A * cos(2*pi/par.T * (t - phi));
+        X0 = [par.L(0)   0   0   0   1];
         
         [i1,i2,i3,i4] = ind2sub(sz,i);
 
@@ -976,9 +959,7 @@ if ismember('duty',doanalysis)
         
         [~,~,data1] = get_limit_cycle(@(t,x) odefcn(t,x,par), 0.005, par.T, X0, ...
             'Display','final', 'fixedperiod',true, 'initialcycles',10, 'TolX',1e-8, 'RelTol',1e-6);
-        data1.lc = par.L(data1.t) - data1.x(:,1);
-        data1.vc = par.V(data1.t) - data1.x(:,2);
-        data1.Pc = Pc(data1.lc, data1.vc, data1.x(:,4), par);
+        data1.Pc = Pc(data1.x(:,1), data1.x(:,2), data1.x(:,4), par);
         
         data1 = get_floquet(data1,@(t,x) jfcn(t,x,par), nfourier);
         data1.k30 = par.k30;
@@ -987,23 +968,24 @@ if ismember('duty',doanalysis)
         data1.phi = phi;
         
         h5write(dutyfile, '/L',par.L(data1.t), [1 i1 i2 i3 i4], [nt 1 1 1 1]);
-        h5write(dutyfile, '/V',par.V(data1.t), [1 i1 i2 i3 i4], [nt 1 1 1 1]);
+        h5write(dutyfile, '/V',par.Lp(data1.t), [1 i1 i2 i3 i4], [nt 1 1 1 1]);
 
-        h5write(dutyfile, '/ls', data1.x(:,1), [1 i1 i2 i3 i4], [nt 1 1 1 1]);
-        h5write(dutyfile, '/vs', data1.x(:,2), [1 i1 i2 i3 i4], [nt 1 1 1 1]);
+        h5write(dutyfile, '/lc', data1.x(:,1), [1 i1 i2 i3 i4], [nt 1 1 1 1]);
+        h5write(dutyfile, '/vc', data1.x(:,2), [1 i1 i2 i3 i4], [nt 1 1 1 1]);
         h5write(dutyfile, '/Ca', data1.x(:,3), [1 i1 i2 i3 i4], [nt 1 1 1 1]);
         h5write(dutyfile, '/Caf', data1.x(:,4), [1 i1 i2 i3 i4], [nt 1 1 1 1]);
         h5write(dutyfile, '/m', data1.x(:,5), [1 i1 i2 i3 i4], [nt 1 1 1 1]);
         
         h5write(dutyfile, '/Pc',data1.Pc, [1 i1 i2 i3 i4], [nt 1 1 1 1]);
-        h5write(dutyfile, '/lc',data1.lc, [1 i1 i2 i3 i4], [nt 1 1 1 1]);
-        h5write(dutyfile, '/vc',data1.vc, [1 i1 i2 i3 i4], [nt 1 1 1 1]);
 
         h5write(dutyfile, '/fx',data1.fx, [1 1 1 i1 i2 i3 i4], [nt nd nd 1 1 1 1]);
         h5write(dutyfile, '/fexp',data1.fexp, [1 i1 i2 i3 i4], [nd 1 1 1 1]);
         h5write(dutyfile, '/fmode',data1.fmode, [1 1 1 i1 i2 i3 i4], [2*nfourier+1 nd nd 1 1 1 1]);
         
         progress(i);
+        if check
+            break;
+        end
     end
 end
 
@@ -1083,7 +1065,7 @@ dCa = (k4 .* Caf - k3 .* Ca) .* (1 - Caf) + ...
     (1 - gact) .* par.k2 .* Ca .* (par.C - par.S - Ca - Caf);
 dlc = vc;
 
-dvc = 1/par.msarc * (Pcval - par.mu*Lval - par.msarc*Lppval + par.mu*lc);
+dvc = -1/par.msarc * (Pcval - par.mu*Lval - par.msarc*Lppval + par.mu*lc);
 
 dx = [dlc; dvc; dCa; dCaf; dm];
 
@@ -1091,29 +1073,8 @@ dx = [dlc; dvc; dCa; dCaf; dm];
     
 function J = jfcn(t,x, par)
 
-% From Mathematica:
-% [0,1,0,0,0;mm.^(-1).*((-1).*mu0+(-1).*Caf.*mu1+(-1).*Caf.*alpha(V+ ...
-%   (-1).*vs).*Derivative(1)(lambda)(L+(-1).*ls)),mm.^(-1).*((-1).*b+( ...
-%   -1).*Caf.*lambda(L+(-1).*ls).*Derivative(1)(alpha)(V+(-1).*vs)),0, ...
-%   mm.^(-1).*((-1).*ls.*mu1+alpha(V+(-1).*vs).*lambda(L+(-1).*ls)),0; ...
-%   0,0,(-1).*(1+(-1).*Caf).*k30.*m.^(-1/2)+(-1).*Ca.*k2.*(1+(-1).*g(( ...
-%   -0.5E0)+a))+k2.*(C+(-1).*Ca+(-1).*Caf+(-1).*S).*(1+(-1).*g(( ...
-% -0.5E0)+a))+(-1).*k1.*g((-0.5E0)+a),Ca.*k30.*m.^(-1/2)+(1+(-1).* ...
-%  Caf).*k40.*m.^(1/2)+(-1).*Caf.*k40.*m.^(1/2)+(-1).*Ca.*k2.*(1+(-1) ...
-%   .*g((-0.5E0)+a))+(-1).*k1.*g((-0.5E0)+a),(1+(-1).*Caf).*((1/2).* ...
-%   Ca.*k30.*m.^(-3/2)+(1/2).*Caf.*k40.*m.^(-1/2));0,0,(1+(-1).*Caf).* ...
-%   k30.*m.^(-1/2),(-1).*Ca.*k30.*m.^(-1/2)+(-1).*(1+(-1).*Caf).*k40.* ...
-%   m.^(1/2)+Caf.*k40.*m.^(1/2),(1+(-1).*Caf).*((-1/2).*Ca.*k30.*m.^( ...
-%   -3/2)+(-1/2).*Caf.*k40.*m.^(-1/2));(-1).*Caf.*km1.*alpha(V+(-1).* ...
-%   vs).*h((-1).*V+vs).*Derivative(1)(lambda)(L+(-1).*ls),(-1).*Caf.* ...
-%   km1.*h((-1).*V+vs).*lambda(L+(-1).*ls).*Derivative(1)(alpha)(V+( ...
-%   -1).*vs)+km2.*((-1)+m).*Derivative(1)(g)(V+(-1).*vs)+Caf.*km1.* ...
-%   alpha(V+(-1).*vs).*lambda(L+(-1).*ls).*Derivative(1)(h)((-1).*V+ ...
-%   vs),0,km1.*alpha(V+(-1).*vs).*h((-1).*V+vs).*lambda(L+(-1).*ls),( ...
-%   -1).*km2.*g(V+(-1).*vs)];
-
-ls = x(1,:);
-vs = x(2,:);
+lc = x(1,:);
+vc = x(2,:);
 Ca = x(3,:);
 Caf = x(4,:);
 m = x(5,:);
@@ -1121,10 +1082,7 @@ m = x(5,:);
 sqm = sqrt(m);
 
 Lval = par.L(t);
-Vval = par.V(t);
-
-lc = Lval - ls;
-vc = Vval - vs;
+Lppval = par.Lpp(t);
 
 [lambdaval,dl] = lambda(lc, par);
 [alphaval,da] = alpha(vc, par);
@@ -1132,34 +1090,32 @@ actval = par.act(t);
 gact = g(actval-0.5, par);
 [gvc,dg] = g(vc,par);
 
-hvcm = h(-vc,par);
-
-muval = mu(Caf, par);
+[hvcm,dhvcm] = h(-vc,par);
 
 J = [0,1,0,0,0; ...
     ...
-    1/par.mm .* (-muval - Caf.*par.mu1 - dl.*alphaval.*Caf), ...
-    1/par.mm .* (-par.b - lambdaval.*da.*Caf), ...
+    -1/par.msarc .* (par.mu + Caf.*alphaval.*dl), ...
+    -1/par.msarc .* Caf.*lambdaval.*da, ...
     0, ...
-    1/par.mm .* (-ls.*par.mu1 + alphaval.*lambdaval),...
+    -1/par.msarc .* alphaval.*lambdaval,...
     0; ...
     ...
     0, ...
     0, ...
-    -(1 - Caf).*par.k30./sqm - Ca.*par.k2.*(1 - gact) + ...
-            par.k2.*(par.C - par.S - Ca - Caf) .* (1 - gact) - par.k1 .* gact, ...
-    Ca.*par.k30./sqm + (1 - 2*Caf).*par.k40.*sqm - Ca.*par.k2.*(1 - gact) - par.k1.*gact, ...
-    (1 - Caf) .* (0.5.*Ca .* par.k30 .* m.^-1.5 + 0.5.*Caf.*par.k40./sqm); ...
+    -gact.*par.k1 - Ca.*(1-gact).*par.k2 - (1-Caf).*par.k30./sqm + ...
+            (1-gact).*par.k2.*(par.C - par.S - Ca - Caf), ...
+    gact.*(-par.k1 + Ca.*par.k2) + (Ca.*(par.k30 - par.k2.*sqm) + (1-2*Caf).*par.k40.*m)./sqm, ...
+    (1 - Caf) .* (Ca.*par.k30 + Caf.*par.k40.*m) ./ (2*sqm.^3); ...
     ...
     0, ...
     0, ...
     (1 - Caf) .* par.k30./sqm, ...
     -Ca.*par.k30./sqm - (1 - 2*Caf).*par.k40.*sqm,...
-    (1 - Caf) .* (-0.5.*Ca.*par.k30.*m.^-1.5 - 0.5.*Caf.*par.k40./sqm); ...
+    -(1 - Caf) .* (Ca.*par.k30 + Caf.*par.k40.*m) ./ (2*sqm.^3); ...
     ...
-    -Caf.*par.km1.*alphaval .* hvcm .* dl, ...
-    -Caf.*par.km1.*hvcm.*lambdaval.*da + par.km2.*(m-1).*dg + ...
-            Caf.*par.km1.*alphaval.*lambdaval.*hvcm,...
+    Caf.*par.km1.*alphaval .* hvcm .* dl, ...
+    Caf.*par.km1.*hvcm.*lambdaval.*da + par.km2.*(1-m).*dg - ...
+            Caf.*par.km1.*alphaval.*lambdaval.*dhvcm,...
     0,...
     par.km1.*alphaval.*hvcm.*lambdaval,...
     -par.km2.*gvc];

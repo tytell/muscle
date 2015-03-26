@@ -1,4 +1,4 @@
-function check_jacobian(t,X,dx, statefcn,jacobianfcn)
+function d = check_jacobian(t,X,dx, statefcn,jacobianfcn)
 
 Jn = zeros(length(X), length(X));
 
@@ -21,3 +21,5 @@ Ja = jacobianfcn(t,X);
 fprintf('Norm of difference in analytical and numerical Jacobian: %f\n', norm(Ja-Jn));
 fprintf('Difference matrix:\n');
 disp(Ja-Jn);
+d = norm(Ja-Jn);
+
