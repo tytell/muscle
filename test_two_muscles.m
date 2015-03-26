@@ -5,8 +5,8 @@ function test_two_muscles
 
 filename = 'test_two_muscles.h5';
 quiet = true;
-doanalysis = {'freq','damping','duty','nonlin'};
-doplot = {}; %{'base','freq','damping','duty',};
+doanalysis = {}; %{'freq','damping','duty','nonlin'};
+doplot = {'base','freq','damping','duty',};
 
 par.L0 = 2.94;                  % mm
 par.Lis = 2.7;                  % mm
@@ -212,10 +212,22 @@ if ismember('freq',doplot)
     fxx(:,:,1,:) = bsxfun(@times, fxx(:,:,1,:), sgn1);
 
     fexp = cat(2,freqdata.fexp);
-
+    isrealexp = imag(fexp) == 0;
+    
+    isrealexp1 = isrealexp(1:2,:);
+    fexp1(1:2,:) = real(fexp(1:2,:));
+    fexp1(2,~isrealexp(1,:)) = real(fexp(3,~isrealexp(1,:)));
+    isrealexp1(2,~isrealexp(1,:)) = isrealexp(3,~isrealexp(1,:));
+    ftime1 = log(0.5)./fexp1;
+    
     figureseries('Floquet exponents vs resonant frequency');
     clf;
-    plot(1./(omegarvals/(2*pi)), log(0.5) ./ real(fexp(1:2,:))');
+    freqratio1 = repmat(1./(omegarvals/(2*pi)),[2 1]);
+    mplot(freqratio1',ftime1','k-|b--', ...
+        freqratio1(1,isrealexp1(1,:)),ftime1(1,isrealexp1(1,:)),'kof', ...
+        freqratio1(1,~isrealexp1(1,:)),ftime1(1,~isrealexp1(1,:)),'ks', ...
+        freqratio1(2,isrealexp1(2,:)),ftime1(2,isrealexp1(2,:)),'bof', ...
+        freqratio1(2,~isrealexp1(2,:)),ftime1(2,~isrealexp1(2,:)),'bs');
     xlabel('Frequency ratio f_{act}/f_{res} (Hz)');
     ylabel('t_{1/2} (sec)');
     title('Mode one time constants');
@@ -228,16 +240,16 @@ if ismember('freq',doplot)
         subplot(2,2,i);
         j = showfreq(i);
         
-        if (isreal(fxx(:,:,1,j)))
-            hln(1:5) = plot(freqdata(j).t, fxx(:,1:5,1,j));
-            hln(6:10) = addplot(freqdata(j).t, fxx(:,6:10,1,j),'--');
-            hln(11:12) = addmplot(freqdata(j).t, fxx(:,11:12,1,j),'k-|k--','LineWidth',2);
-        else
-            plot(freqdata(j).t, real(fxx(:,:,1,j)));
-            addplot(freqdata(j).t, imag(fxx(:,:,1,j)),'--');
-        end
+        hln(1:5) = plot(freqdata(j).t, real(fxx(:,1:5,1,j)));
+        hln(6:10) = addplot(freqdata(j).t, real(fxx(:,6:10,1,j)),'--');
+        hln(11:12) = addmplot(freqdata(j).t, real(fxx(:,11:12,1,j)),'k-|k--','LineWidth',2);
         xlabel('Time (s)');
-        title(sprintf('f_{res} = %g',omegarvals(j)/(2*pi)));
+        if (isreal(fxx(:,:,1,j)))
+            realtxt = 'real';
+        else
+            realtxt = 'complex';
+        end
+        title(sprintf('%s: f_{res} = %g',realtxt, omegarvals(j)/(2*pi)));
     end
     legend(hln([1:5 11:12]),'ls','vs','Ca','Caf','m','L','V','Location','best');
     print('-dpdf','test_two_muscles-4.pdf');
